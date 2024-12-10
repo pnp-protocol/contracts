@@ -9,7 +9,7 @@ to burn their holdings for the collateral.
 #### registry part
 This contracts acts as a registry for all the truth modules contracts in existence.
 A function to add a new truth module is provided to the factory contract and is `onlyOwner` protected.
-Anyone can request to add a new truth module contract by submitting the contract in our discord and we will add it to the registry after security review.
+Anyone can request to add a new truth module contract by submitting the contract following the ITruthModule.sol interface in our discord and we will add it to the registry after security review.
 `addNewTruthModule(address _truthModule) returns(uint8 moduleId);`
 
 #### PredictionMarketCreation part
@@ -57,8 +57,17 @@ uint256 tokenIdToBurn)`
 - code the burn mechanism in the library.
 
 #### Market Execution part
+- when a market is created and the marketCreator is minted equal YES and NO tokens according to the initial liquidity,
+the market is open for anyone to buy/sell YES and NO tokens on the bonding curve.
+- We are using the Pythagorean Bonding Curve for each market. So create a mapping for conditionId to uint256[] 
+holding state variables for the market. So that we can fetch this and pass on to the bonding curve library contract to mint or burn appropriate amount of tokens.
+- If the market is settled (another state variable for this)
+settled and expired have different meanings. 
+- We have another function called `settleMarket` which can only be called by the corresponding truth module contract address.
+- When the market is settled and we get the correct truth from the Module, users can not call mint or burn decision tokens anymore. Holders of all tokens can only call
+`redeemDecisionTokens` function which rewards all the holders of the current correct ERC1155 tokenId provided by the module contract.
 
-
+ 
 
 
 

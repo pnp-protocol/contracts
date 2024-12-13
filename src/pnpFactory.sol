@@ -10,12 +10,17 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 // bonding curve 
 import {PythagoreanBondingCurve} from "./libraries/PythagoreanBondingCurve.sol";
 
+// interfaces
+import {ITruthModule} from "./interfaces/ITruthModule.sol";
+
 abstract contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
 
     // State variables
 
     /// @dev Maps conditionId of a market to the truth module used
     mapping(bytes32 => uint8) public moduleTypeUsed;
+
+    mapping(uint8 => address) public moduleAddress;
 
     /// @dev Maps conditionId of a market to the market parameters
     mapping(bytes32 => uint256[]) public marketParams;
@@ -26,6 +31,8 @@ abstract contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     mapping(bytes32 => uint256) public marketReserve;
 
     mapping(bytes32 => address) public collateralToken;
+
+    mapping(bytes32 => bytes32) public winningTokenId; // Maps conditionId to winning tokenId
 
     // Events
     event PnpMarketCreated(bytes32 indexed conditionId);
@@ -102,8 +109,38 @@ abstract contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
 
     // Function to burn decision tokens
     function burnDecisionTokens(bytes32 conditionId, uint256 tokenIdToBurn) public nonReentrant {
-        
+        require(block.timestamp < marketParams[conditionId][0], "Market has expired");        
     }
 
-    // Additional functions for market execution and settling...
+    // Function to settle the market
+    function settleMarket(bytes32 conditionId) public {
+        require(!marketSettled[conditionId], "Market already settled brother"); // Check if the market is already settled
+
+        // Derive the module address
+        address moduleAddr = moduleAddress[moduleTypeUsed[conditionId]];
+
+        // Call the settle function from the ITruthModule interface
+        bytes32 winningTokenId = ITruthModule(moduleAddr).settle(conditionId, marketParams[conditionId]);
+
+        // Store the winning token ID and mark the market as settled
+        winningTokenId[conditionId] = winningTokenId;
+        marketSettled[conditionId] = true;
+    }
+
+    // Function to redeem position
+    function redeemPosition(bytes32 conditionId) public {
+        require(winningTokenId[conditionId] != bytes32(0), "Market not settled");
+        require(marketSettled[conditionId], "Market not settled");
+        
+        uint256 userBalance = balanceOf(msg.sender, winningTokenId[conditionId]);
+        uint256 totalSupplyWinningToken = totalSupply(winningTokenId[conditionId]);
+        
+        uint256 reserveToRedeem = (userBalance * marketReserve[conditionId]) / totalSupplyWinningToken;
+        
+        require(reserveToRedeem > 0, "No reserves to redeem");
+        
+        IERC20(collateralToken[conditionId]).transfer(msg.sender, reserveToRedeem);
+    }
+
+    
 }

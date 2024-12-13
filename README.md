@@ -79,6 +79,10 @@ l : reserve to be added
 returns ( uint256 tokenToMint) 
 
 
+## Market Settlement part
+whoever calls settle() will be eligible for a certain portion X of the reserve.
+
+
  
 
 

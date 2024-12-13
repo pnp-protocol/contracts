@@ -7,7 +7,7 @@ interface ITruthModule {
                                        EVENTS
     //////////////////////////////////////////////////////////////////////////*/
 
+    function settle(bytes32 conditionId, uint256[] memory marketParams) external returns(bytes32 winningTokenId);
 
-    
-    
+
 }

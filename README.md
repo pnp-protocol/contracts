@@ -67,6 +67,18 @@ settled and expired have different meanings.
 - When the market is settled and we get the correct truth from the Module, users can not call mint or burn decision tokens anymore. Holders of all tokens can only call
 `redeemDecisionTokens` function which rewards all the holders of the current correct ERC1155 tokenId provided by the module contract.
 
+
+## Pythagorean Bonding Curve part
+This contract will have these functions only :
+
+`getTokensToMint()
+r : total reserve
+a : curr supply of token to mint
+b : curr supply of other token 
+l : reserve to be added  
+returns ( uint256 tokenToMint) 
+
+
  
 
 

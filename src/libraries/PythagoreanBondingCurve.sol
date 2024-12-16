@@ -32,9 +32,7 @@ library PythagoreanBondingCurve {
         // uint256 c = r * r / (a * a + b * b);
 
         // first calculate previous c 
-
-
-        uint256 tokenToMint = c * l;
-
     }
+
+    function getPrice() uint256 r, uint256 a, uint256 b, uint256 l) public pure returns (uint256 price) {}
 }

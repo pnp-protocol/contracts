@@ -32,12 +32,9 @@ library PythagoreanBondingCurve {
         // uint256 c = r * r / (a * a + b * b);
 
         // first calculate previous c 
-        tokenToMint = 0;
 
-    }
 
-`   // gives current price of decision token corresponding to a 
-    function getCurrentPrice(uint256 r, uint256 a, uint256 b) public returns(uint256){
+        uint256 tokenToMint = c * l;
 
     }
 }

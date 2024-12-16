@@ -84,7 +84,12 @@ whoever calls settle() will be eligible for a certain portion X of the reserve.
 
 
  
-
+- registry part
+- PredictionMarket Creation part 
+- Minting and Burning YES and NO tokens part
+- Market settlement part
+- redeeming the decision tokens
+- bonding curve part
 
 
 

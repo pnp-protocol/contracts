@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+// ██████╗░███╗░░██╗██████╗░  ██████╗░██████╗░░█████╗░████████╗░█████╗░░█████╗░░█████╗░██╗░░░░░
+// ██╔══██╗████╗░██║██╔══██╗  ██╔══██╗██╔══██╗██╔══██╗╚══██╔══╝██╔══██╗██╔══██╗██╔══██╗██║░░░░░
+// ██████╔╝██╔██╗██║██████╔╝  ██████╔╝██████╔╝██║░░██║░░░██║░░░██║░░██║██║░░╚═╝██║░░██║██║░░░░░
+// ██╔═══╝░██║╚████║██╔═══╝░  ██╔═══╝░██╔══██╗██║░░██║░░░██║░░░██║░░██║██║░░██╗██║░░██║██║░░░░░
+// ██║░░░░░██║░╚███║██║░░░░░  ██║░░░░░██║░░██║╚█████╔╝░░░██║░░░╚█████╔╝╚█████╔╝╚█████╔╝███████╗
+// ╚═╝░░░░░╚═╝░░╚══╝╚═╝░░░░░  ╚═╝░░░░░╚═╝░░╚═╝░╚════╝░░░░╚═╝░░░░╚════╝░░╚════╝░░╚════╝░╚══════╝
+
 // oz imports
 import {ERC1155Supply} from "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -13,6 +20,7 @@ import {PythagoreanBondingCurve} from "./libraries/PythagoreanBondingCurve.sol";
 // interfaces
 import {ITruthModule} from "./interfaces/ITruthModule.sol";
 
+
 abstract contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
 
     // State variables
@@ -20,6 +28,7 @@ abstract contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     /// @dev Maps conditionId of a market to the truth module used
     mapping(bytes32 => uint8) public moduleTypeUsed;
 
+    /// @dev Maps moduleId to the corresponding truth module address
     mapping(uint8 => address) public moduleAddress;
 
     /// @dev Maps conditionId of a market to the market parameters
@@ -32,13 +41,13 @@ abstract contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
 
     mapping(bytes32 => address) public collateralToken;
 
-    mapping(bytes32 => bytes32) public winningTokenId; // Maps conditionId to winning tokenId
+    mapping(bytes32 => uint256) public winningTokenId; // Maps conditionId to winning tokenId
 
     // Events
     event PnpMarketCreated(bytes32 indexed conditionId);
     event MarketDecisionMinted(bytes32 indexed conditionId, uint256 tokenId, address indexed minter, uint256 amount);
 
-    constructor() ERC1155Supply("httpxfs://api.example.com/metadata/{id}") {}
+    constructor() ERC1155Supply() {}
 
 
     // @TODO : Change marketParams to a struct later as per needs
@@ -78,9 +87,9 @@ abstract contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         collateralToken[conditionId] = _collateral;
 
         // Derive token IDs for YES and NO
-        bytes32 yesTokenId = keccak256(abi.encodePacked(conditionId, "YES"));
-        bytes32 noTokenId = keccak256(abi.encodePacked(conditionId, "NO"));
-
+        uint256 yesTokenId = uint256(keccak256(abi.encodePacked(conditionId, "YES")));
+        uint256 noTokenId = uint256(keccak256(abi.encodePacked(conditionId, "NO")));
+        
         // Mint YES and NO tokens to the sender
         _mint(msg.sender, yesTokenId, _initialLiquidity / 2, ""); // Mint YES tokens
         _mint(msg.sender, noTokenId, _initialLiquidity / 2, ""); // Mint NO tokens
@@ -94,7 +103,9 @@ abstract contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         
         uint256 r = marketReserve[conditionId];
         uint256 a = totalSupply(tokenIdToMint);
-        uint256 b = totalSupply(tokenIdToMint == keccak256(abi.encodePacked(conditionId, "YES")) ? keccak256(abi.encodePacked(conditionId, "NO")) : keccak256(abi.encodePacked(conditionId, "YES")));
+        uint256 b = totalSupply(tokenIdToMint == uint256(keccak256(abi.encodePacked(conditionId, "YES"))) ? 
+        uint256(keccak256(abi.encodePacked(conditionId, "NO"))) : 
+        uint256(keccak256(abi.encodePacked(conditionId, "YES"))));
 
         uint256 tokensToMint = PythagoreanBondingCurve.getTokensToMint(r, a, b, collateralAmount);
 
@@ -109,7 +120,8 @@ abstract contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
 
     // Function to burn decision tokens
     function burnDecisionTokens(bytes32 conditionId, uint256 tokenIdToBurn) public nonReentrant {
-        require(block.timestamp < marketParams[conditionId][0], "Market has expired");        
+        require(block.timestamp < marketParams[conditionId][0], "Market has expired"); 
+               
     }
 
     // Function to settle the market
@@ -120,16 +132,16 @@ abstract contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         address moduleAddr = moduleAddress[moduleTypeUsed[conditionId]];
 
         // Call the settle function from the ITruthModule interface
-        bytes32 winningTokenId = ITruthModule(moduleAddr).settle(conditionId, marketParams[conditionId]);
+        uint256 settledWinningTokenId = ITruthModule(moduleAddr).settle(conditionId, marketParams[conditionId]);
 
         // Store the winning token ID and mark the market as settled
-        winningTokenId[conditionId] = winningTokenId;
+        winningTokenId[conditionId] = settledWinningTokenId;
         marketSettled[conditionId] = true;
     }
 
     // Function to redeem position
     function redeemPosition(bytes32 conditionId) public {
-        require(winningTokenId[conditionId] != bytes32(0), "Market not settled");
+        require(winningTokenId[conditionId] != 0, "Market not settled");
         require(marketSettled[conditionId], "Market not settled");
         
         uint256 userBalance = balanceOf(msg.sender, winningTokenId[conditionId]);

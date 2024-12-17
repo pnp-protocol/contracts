@@ -25,6 +25,7 @@ library PythagoreanBondingCurve {
     // s(yes) : supplies of conditionId YES
     // s(no) : supplies of conditionId NO
 
+    /// @dev Returns additional number of tokens to mint of token A (a)
     function getTokensToMint(uint256 r, uint256 a, uint256 b, uint256 l) public pure returns (uint256 tokenToMint) {
 
         // Calculate the number of tokens to mint based on the bonding curve formula
@@ -56,6 +57,16 @@ library PythagoreanBondingCurve {
         return tokenToMint;
     }
 
+    /// @dev Called when burning decision tokens
+    /// @dev Returns the amount of reserve to be transferred back
+    /// @param tokensToBurn amount of tokens to burn of token A 
+    /// @param a current supply of token A
+    /// @param b current supply of token B
+    /// @param r current reserve
+    function getReserveToRelease(uint256 r, uint256 a, uint256 b, uint256 tokensToBurn) public returns (uint256 reserveToRelease) {
+
+    }
+
     // Helper function to calculate square root
     // Babylonian square root function  
     function sqrt(uint256 x) internal pure returns (uint256) {
@@ -72,5 +83,6 @@ library PythagoreanBondingCurve {
         return y;
     }
 
-    function getPrice() uint256 r, uint256 a, uint256 b, uint256 l) public pure returns (uint256 price) {}
+    /// @dev Returns price of token A in terms of collateral token 
+    function getPrice(uint256 r, uint256 a, uint256 b, uint256 l) public pure returns (uint256 price) {}
 }

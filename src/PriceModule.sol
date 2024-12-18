@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 // ██████╗░███╗░░██╗██████╗░  ██████╗░██████╗░░█████╗░████████╗░█████╗░░█████╗░░█████╗░██╗░░░░░
 // ██╔══██╗████╗░██║██╔══██╗  ██╔══██╗██╔══██╗██╔══██╗╚══██╔══╝██╔══██╗██╔══██╗██╔══██╗██║░░░░░
 // ██████╔╝██╔██╗██║██████╔╝  ██████╔╝██████╔╝██║░░██║░░░██║░░░██║░░██║██║░░╚═╝██║░░██║██║░░░░░
-// ██╔═══╝░██║╚████║██╔═══╝░  ██╔═══╝░██╔══██╗██║░░██║░░░██║░░░██║░░██║██║░░██╗██║░░██║██║░░��░░
+// ██╔═══╝░██║╚████║██╔═══╝░  ██╔═══╝░██╔══██╗██║░░██║░░░██║░░░██║░░██║██║░░██╗██║░░██║██║░░░░░
 // ██║░░░░░██║░╚███║██║░░░░░  ██║░░░░░██║░░██║╚█████╔╝░░░██║░░░╚█████╔╝╚█████╔╝╚█████╔╝███████╗
 // ╚═╝░░░░░╚═╝░░╚══╝╚═╝░░░░░  ╚═╝░░░░░╚═╝░░╚═╝░╚════╝░░░░╚═╝░░░░╚════╝░░╚════╝░░╚════╝░╚══════╝
 
@@ -13,6 +13,19 @@ import {IUniswapV3Pool} from "lib/v3-core/contracts/interfaces/IUniswapV3Pool.so
 
 // for uniswap V3 Pools
 contract PriceModule is ITruthModule {
+    // State variable for settling time
+    mapping(bytes32 => uint256) public settlingTime;
+    
+    // Event to emit when settling time is set
+    event SettlingTimeSet(bytes32 indexed conditionId, uint256 time);
+    
+    // Function to set settling time for a market
+    function setSettlingTime(bytes32 conditionId, uint256 _settlingTime) external {
+        require(_settlingTime > block.timestamp, "Settling time must be in future");
+        settlingTime[conditionId] = _settlingTime;
+        emit SettlingTimeSet(conditionId, _settlingTime);
+    }
+
     // Function to fetch the price of a token from Uniswap V3 Pool
     function getPrice(IUniswapV3Pool pool) public view returns (uint256 price) {
         (uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
@@ -53,12 +66,12 @@ contract PriceModule is ITruthModule {
         bytes32 conditionId,
         uint256[] memory _marketParams
     ) external override returns (uint256 winningTokenId) {
-        //  _winningTokenId = keccak256(abi.encodePacked(conditionId, _marketParams[0])); // Example logic
+        require(block.timestamp >= settlingTime[conditionId], "Market not ready for settlement");
+        require(settlingTime[conditionId] > 0, "Settling time not set");
+        
+        // Your existing settlement logic
         winningTokenId = uint256(
             keccak256(abi.encodePacked(conditionId, "YES"))
-        );
-        winningTokenId = uint256(
-            keccak256(abi.encodePacked(conditionId, "NO"))
         );
     }
 }

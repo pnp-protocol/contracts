@@ -7,7 +7,7 @@ pragma solidity >=0.8.22;
 // ██████╔╝░░░  ██████╦╝██║░░██║██╔██╗██║██║░░██║██║██╔██╗██║██║░░██╗░
 // ██╔═══╝░░░░  ██╔══██╗██║░░██║██║╚████║██║░░██║██║██║╚████║██║░░╚██╗
 // ██║░░░░░██╗  ██████╦╝╚█████╔╝██║░╚███║██████╔╝██║██║░╚███║╚██████╔╝
-// ╚═╝░░░░░╚═╝  ╚═════╝░░╚═══���╝░╚═╝░░╚══╝╚═════╝░╚═╝╚═╝░░╚══╝░╚═════╝░
+// ╚═╝░░░░░╚═╝  ╚═════╝░░╚═══�������╝░╚═╝░░╚══╝╚═════╝░╚═╝╚═╝░░╚══╝░╚═════╝░
 
 // ░█████╗░██╗░░░██╗██████╗░██╗░░░██╗███████╗
 // ██╔══██╗██║░░░██║██╔══██╗██║░░░██║██╔════╝
@@ -63,30 +63,49 @@ library PythagoreanBondingCurve {
     /// @param a current supply of token A
     /// @param b current supply of token B
     /// @param r current reserve
-    function getReserveToRelease(uint256 r, uint256 a, uint256 b, uint256 tokensToBurn) public returns (uint256 reserveToRelease) {
+    function getReserveToRelease(uint256 r, uint256 a, uint256 b, uint256 tokensToBurn) public pure returns (uint256 reserveToRelease) {
+        // Ensure we don't divide by zero
+        require(a * a + b * b > 0, "Invalid token supplies");
+        require(tokensToBurn > 0, "Must burn positive amount");
+        require(tokensToBurn <= a, "Cannot burn more than supply");
         
+        // Calculate the constant c = r² / (a² + b²)
+        uint256 c = (r * r) / (a * a + b * b);
+        
+        // Calculate new supply after burning
+        uint256 newSupply = a - tokensToBurn;
+        
+        // Calculate current reserve based on current supplies
+        uint256 currentReserveSquared = c * (a * a + b * b);
+        
+        // Calculate new reserve based on new supplies
+        uint256 newReserveSquared = c * (newSupply * newSupply + b * b);
+        
+        // The reserve to release is the difference between current and new reserves
+        uint256 currentReserve = sqrt(currentReserveSquared);
+        uint256 newReserve = sqrt(newReserveSquared);
+        
+        reserveToRelease = currentReserve - newReserve;
+        
+        return reserveToRelease;
     }
 
     /// @dev Returns price of token A in terms of collateral token 
-    function getPrice(uint256 r, uint256 a, uint256 b, uint256 l) public pure returns (uint256 price) {
+    function getPrice(uint256 r, uint256 a, uint256 b) public pure returns (uint256 price) {
+        // Ensure we don't divide by zero
+        require(a * a + b * b > 0, "Invalid token supplies");
+        
+        // Calculate the constant c = r² / (a² + b²)
         uint256 c = (r * r) / (a * a + b * b);
-
-        // first calculate previous c 
-        // Calculate new total reserve after adding l
-        uint256 newR = r + l;
-
-        // Using the Pythagorean formula:
-        // For token supply s: c = r² / (s² + b²)
-        // Rearranging to solve for new supply:
-        // s = sqrt((newR² / c) - b²)
-        uint256 newSupplySquared = (newR * newR) / c - (b * b);
-
-        uint256 newPriceSquared = (c * newSupplySquared) /
-            (newSupplySquared + b * b);
-
-        uint256 newPrice = sqrt(newPriceSquared);
-
-        return newPrice;
+        
+        // The price is determined by the derivative of the bonding curve
+        // For Pythagorean curve: price = c * a / sqrt(a² + b²)
+        uint256 denominator = sqrt(a * a + b * b);
+        require(denominator > 0, "Invalid denominator");
+        
+        price = (c * a) / denominator;
+        
+        return price;
     }
 
     // Helper function to calculate square root

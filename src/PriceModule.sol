@@ -37,22 +37,22 @@ contract PriceModule is ITruthModule {
         // 1. Square the sqrtPriceX96
         uint256 numerator = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
 
-        console2.log("priceX192:", numerator);
+        //console2.log("priceX192:", numerator);
 
         // 2. Convert from Q192 to Q96 format
         uint256 denominator = 1 << 192;
 
-        console2.log("basePrice:", denominator);
+        //console2.log("basePrice:", denominator);
 
         // 3. Adjust for decimals (ETH/USDC)
         // USDC has 6 decimals, ETH has 18 decimals
         // We need to multiply by 10^6 (USDC decimals)
         price = (numerator * 10 ** 12) / denominator;
 
-        console2.log("Price:", price);
+        //console2.log("Price:", price);
 
         // Basic sanity check
-        assertTrue(price > 0, "Price should be greater than 0");
+        //assertTrue(price > 0, "Price should be greater than 0");
 
         // // ETH price should be roughly between 1000-5000 USDC
         // assertTrue(price >= 1000e6 && price <= 5000e6, "Price outside reasonable range");

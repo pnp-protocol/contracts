@@ -1,26 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-// ██████╗░███╗░░██╗██████╗░  ██████╗░██████╗░░█████╗░████████╗░█████╗░░█████╗░░█████╗░██╗░░░░░
-// ██╔══██╗████╗░██║██╔══██╗  ██╔══██╗██╔══██╗██╔══██╗╚══██╔══╝██╔══██╗██╔══██╗██╔══██╗██║░░░░░
-// ██████╔╝██╔██╗██║██████╔╝  ██████╔╝██████╔╝██║░░██║░░░██║░░░██║░░██║██║░░╚═╝██║░░██║██║░░░░░
-// ██╔═══╝░██║╚████║██╔═══╝░  ██╔═══╝░██╔══██╗██║░░██║░░░██║░░░██║░░██║██║░░██╗██║░░██║██║░░░░░
-// ██║░░░░░██║░╚███║██║░░░░░  ██║░░░░░██║░░██║╚█████╔╝░░░██║░░░╚█████╔╝╚█████╔╝╚█████╔╝███████╗
-// ╚═╝░░░░░╚═╝░░╚══╝╚═╝░░░░░  ╚═╝░░░░░╚═╝░░╚═╝░╚════╝░░░░╚═╝░░░░╚════╝░░╚════╝░░╚════╝░╚══════╝
-
 // oz imports
 import {ERC1155Supply} from "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // bonding curve 
 import {PythagoreanBondingCurve} from "./libraries/PythagoreanBondingCurve.sol";
 
 // interfaces
 import {ITruthModule} from "./interfaces/ITruthModule.sol";
-
 
 contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
 
@@ -45,6 +38,8 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     mapping(bytes32 => uint256) public winningTokenId; 
 
     mapping(bytes32 => address) public conditionIdToPool; 
+
+    uint256 constant DECISION_TOKEN_DECIMALS = 18;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -95,46 +90,48 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         uint256 _initialLiquidity,
         address _tokenInQuestion,
         uint8 _moduleId,
-        address _collateral,
+        address _collateralToken,
         uint256[] memory _marketParams,
-        address _pool // New parameter
-    ) public nonReentrant returns (bytes32 conditionId) {
+        address _pool 
+    ) external nonReentrant returns (bytes32) {
         require(_initialLiquidity % 2 == 0 && _initialLiquidity != 0, "Invalid liquidity");
     
-        require(_collateral != address(0), "Collateral must not be zero address");
+        require(_collateralToken != address(0), "Collateral must not be zero address");
         if(_marketParams[0] <= block.timestamp) {
             revert InvalidMarketEndTime(msg.sender, _marketParams[0]);
         }
 
-        // Create conditionId based on market parameters
-        conditionId = keccak256(abi.encodePacked(_tokenInQuestion, _marketParams));
+        // Get collateral token decimals
+        uint256 collateralDecimals = IERC20Metadata(_collateralToken).decimals();
+        
+        // Scale initial liquidity to 18 decimals for consistent math
+        // If USDC (6 decimals) sends 100 USDC, this converts to 100 * 10^18
+        uint256 scaledLiquidity = (_initialLiquidity * 10**DECISION_TOKEN_DECIMALS) / 10**collateralDecimals;
 
-        // Transfer initial liquidity from sender to contract
-        IERC20(_collateral).transferFrom(msg.sender, address(this), _initialLiquidity);
+        // Transfer the actual token amount (unscaled)
+        IERC20Metadata(_collateralToken).transferFrom(msg.sender, address(this), _initialLiquidity);
+        
+        // Generate condition ID
+        bytes32 conditionId = keccak256(abi.encodePacked(_tokenInQuestion, _marketParams));
 
-        // Update market reserve with the transferred liquidity
-        marketReserve[conditionId] = _initialLiquidity;
-
-        // Initialize market parameters with the new conditionId
-        marketParams[conditionId] = _marketParams;
-
-        // Store the module type used for this market
+        // Store market parameters
         moduleTypeUsed[conditionId] = _moduleId;
-
-        collateralToken[conditionId] = _collateral;
-
-        // Store the pool address
+        marketParams[conditionId] = _marketParams;
+        marketSettled[conditionId] = false;
+        marketReserve[conditionId] = scaledLiquidity; // Store scaled liquidity
+        collateralToken[conditionId] = _collateralToken;
         conditionIdToPool[conditionId] = _pool;
 
         // Derive token IDs for YES and NO
         uint256 yesTokenId = uint256(keccak256(abi.encodePacked(conditionId, "YES")));
         uint256 noTokenId = uint256(keccak256(abi.encodePacked(conditionId, "NO")));
         
-        // Mint YES and NO tokens to the sender
-        _mint(msg.sender, yesTokenId, _initialLiquidity / 2, ""); // Mint YES tokens
-        _mint(msg.sender, noTokenId, _initialLiquidity / 2, ""); // Mint NO tokens
+        // Mint YES and NO tokens using scaled liquidity
+        _mint(msg.sender, yesTokenId, scaledLiquidity, ""); // Mint YES tokens
+        _mint(msg.sender, noTokenId, scaledLiquidity, ""); // Mint NO tokens
 
         emit PnpMarketCreated(conditionId); // Emit event for market creation
+        return conditionId;
     }
 
     // Function to mint decision tokens
@@ -143,20 +140,44 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
             revert MarketTradingStopped();
         }
         
-        uint256 r = marketReserve[conditionId];
-        uint256 a = totalSupply(tokenIdToMint);
-        uint256 b = totalSupply(tokenIdToMint == uint256(keccak256(abi.encodePacked(conditionId, "YES"))) ? 
-        uint256(keccak256(abi.encodePacked(conditionId, "NO"))) : 
-        uint256(keccak256(abi.encodePacked(conditionId, "YES"))));
+        // Get collateral token decimals and scale amount
+        uint256 collateralDecimals = IERC20Metadata(collateralToken[conditionId]).decimals();
+        uint256 scaledAmount = (collateralAmount * 10**DECISION_TOKEN_DECIMALS) / 10**collateralDecimals;
 
-        marketReserve[conditionId] += collateralAmount;
+        // Get current scaled reserves and supplies
+        uint256 scaledReserve = marketReserve[conditionId];
+        
+        // Calculate token supplies (already in 18 decimals as we mint them that way)
+        uint256 yesTokenId = uint256(keccak256(abi.encodePacked(conditionId, "YES")));
+        uint256 noTokenId = uint256(keccak256(abi.encodePacked(conditionId, "NO")));
+        
+        uint256 yesSupply = totalSupply(yesTokenId);
+        uint256 noSupply = totalSupply(noTokenId);
 
-        uint256 tokensToMint = PythagoreanBondingCurve.getTokensToMint(r, a, b, collateralAmount);
+        uint256 tokensToMint;
+        if (tokenIdToMint == yesTokenId) {
+            tokensToMint = PythagoreanBondingCurve.getTokensToMint(
+                scaledReserve,
+                yesSupply,
+                noSupply,
+                scaledAmount
+            );
+        } else {
+            tokensToMint = PythagoreanBondingCurve.getTokensToMint(
+                scaledReserve,
+                noSupply,
+                yesSupply,
+                scaledAmount
+            );
+        }
 
-        // Transfer collateralAmount from msg.sender to the contract
+        // Transfer the actual token amount (unscaled)
         IERC20(collateralToken[conditionId]).transferFrom(msg.sender, address(this), collateralAmount);
-
-        // Mint the respective number of tokens to msg.sender
+        
+        // Update scaled reserve
+        marketReserve[conditionId] = scaledReserve + scaledAmount;
+        
+        // Mint the decision tokens (already in 18 decimals)
         _mint(msg.sender, tokenIdToMint, tokensToMint, "");
 
         emit DecisionTokensMinted(conditionId, tokenIdToMint, msg.sender, collateralAmount);

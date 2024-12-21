@@ -95,3 +95,7 @@ whoever calls settle() will be eligible for a certain portion X of the reserve.
 
 
 
+- test for minting yes tokens after market creation 
+- test for minting after ending market
+- test for settling market 
+- tesr for redeeming decision tokens

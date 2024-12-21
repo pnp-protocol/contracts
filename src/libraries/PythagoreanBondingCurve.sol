@@ -27,29 +27,39 @@ library PythagoreanBondingCurve {
 
     /// @dev Returns additional number of tokens to mint of token A (a)
     function getTokensToMint(uint256 r, uint256 a, uint256 b, uint256 l) public pure returns (uint256 tokenToMint) {
-
-        // Calculate the number of tokens to mint based on the bonding curve formula
-        // according to <https://blog.obyte.org/introducing-prophet-prediction-markets-based-on-bonding-curves-3716651db344>
-
-        // Ensure we don't divide by zero
-        require(a * a + b * b > 0, "Invalid token supplies");
+        // Ensure we don't divide by zero and have valid inputs
+        require(a > 0 && b > 0, "Token supplies must be positive");
         require(l > 0, "Reserve to add must be positive");
+        require(r > 0, "Initial reserve must be positive");
+        
+        // Calculate squares first
+        uint256 r_squared = r * r;
+        uint256 a_squared = a * a;
+        uint256 b_squared = b * b;
+        uint256 denominator = a_squared + b_squared;
+        
+        require(denominator > 0, "Invalid denominator");
         
         // Calculate the constant c = r² / (a² + b²)
-        // This represents the "price" constant in the bonding curve
-        uint256 c = (r * r) / (a * a + b * b);
+        uint256 c = r_squared / denominator;
+        require(c > 0, "Invalid price constant");
         
         // Calculate new total reserve after adding l
         uint256 newR = r + l;
+        uint256 newR_squared = newR * newR;
         
         // Using the Pythagorean formula:
         // For token supply s: c = r² / (s² + b²)
         // Rearranging to solve for new supply:
         // s = sqrt((newR² / c) - b²)
-        uint256 newSupplySquared = (newR * newR) / c - (b * b);
+        uint256 temp = newR_squared / c;
+        require(temp > b_squared, "Invalid square calculation");
+        
+        uint256 newSupplySquared = temp - b_squared;
         
         // Calculate the square root to get the new total supply
         uint256 newSupply = sqrt(newSupplySquared);
+        require(newSupply > a, "No new tokens to mint");
         
         // The amount to mint is the difference between new supply and current supply
         tokenToMint = newSupply - a;

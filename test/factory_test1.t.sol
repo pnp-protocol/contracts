@@ -5,6 +5,8 @@ import {Test, console2, Vm} from "../lib/forge-std/src/Test.sol";
 import {PNPFactory} from "../src/PNPFactory.sol";
 import {PythagoreanBondingCurve} from "../src/libraries/PythagoreanBondingCurve.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {ERC1155Supply} from "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 import {ITruthModule} from "../src/interfaces/ITruthModule.sol";
 import {IUniswapV3Pool} from "lib/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
@@ -98,21 +100,64 @@ contract FactoryTest is Test {
         uint256 gasStart = gasleft();
         bytes32 conditionId = factory.createPredictionMarket(initialLiquidity, tokenInQuestion, moduleId, collateralToken, marketParams, pool);
         uint256 gasSpent = gasStart - gasleft();
-        console2.log("Prediction market created with conditionId: ", conditionId);
-        console2.log("Total gas spent in creating the market: ", gasSpent);
+        // console2.log("Prediction market created with conditionId: ");
+        // console2.log(conditionId);
+        console2.log("Total gas spent in creating the market: ", gasSpent);   
         vm.stopPrank();
 
         // we assert the mappings for the market 
-        assertEq(factory.moduleTypeUsed[conditionId], moduleId);
-        assertEq(factory.marketParams[conditionId][0], block.timestamp + 15);
-        assertEq(factory.marketParams[conditionId][1], targetPrice); 
-        assertEq(factory.marketSettled[conditionId], false);
-        assertEq(factory.marketReserve[conditionId], initialLiquidity);
-        assertEq(factory.winningTokenId[conditionId],0);
+        assertEq(factory.moduleTypeUsed(conditionId), moduleId);
+        
+        // Scale the assertions according to decimals
+        uint256 collateralDecimals = IERC20Metadata(collateralToken).decimals();
+        uint256 scaledInitialLiquidity = (initialLiquidity * 10**18) / 10**collateralDecimals;
+        uint256 scaledTargetPrice = (targetPrice * 10**18) / 10**collateralDecimals;
+        
+        assertEq(factory.marketParams(conditionId, 0), block.timestamp + 15);
+        assertEq(factory.marketParams(conditionId, 1), targetPrice); 
+        assertEq(factory.marketSettled(conditionId), false);
+        assertEq(factory.marketReserve(conditionId), scaledInitialLiquidity);
+        assertEq(factory.winningTokenId(conditionId), 0);
 
         // check YES NO token balances of alice   
-
+        uint256 yesTokenId = uint256(keccak256(abi.encodePacked(conditionId, "YES")));
+        uint256 noTokenId = uint256(keccak256(abi.encodePacked(conditionId, "NO")));
         
+        assertEq(factory.balanceOf(alice, yesTokenId), scaledInitialLiquidity);
+        assertEq(factory.balanceOf(alice, noTokenId), scaledInitialLiquidity);
+
+        vm.startPrank(bob);
+        // bob wants to buy $100 worth of yes tokens 
+        IERC20(collateralToken).approve(address(factory), 100*10**6);
+        uint256 prevBalance = IERC20(collateralToken).balanceOf(address(factory));
+        factory.mintDecisionTokens(conditionId, 100*10**6, yesTokenId);
+        uint256 bobYesBalance = factory.balanceOf(bob, yesTokenId);
+        console2.log("YES token balance of bob (in 18 decimals): ", bobYesBalance);
+        assertEq(IERC20(collateralToken).balanceOf(address(factory)) - prevBalance, 100*10**6);
+        vm.stopPrank();
+
+        // console log out the price of YES and NO tokens 
+        uint256 marketReserve = factory.marketReserve(conditionId);
+        uint256 priceOfYes = PythagoreanBondingCurve.getPrice(marketReserve, factory.totalSupply(yesTokenId), factory.totalSupply(noTokenId));
+        uint256 priceOfNo = PythagoreanBondingCurve.getPrice(marketReserve, factory.totalSupply(noTokenId), factory.totalSupply(yesTokenId));
+        console2.log("Price of YES token (in 18 decimals): ", priceOfYes);
+        console2.log("Price of NO token (in 18 decimals): ", priceOfNo);
+
+        // eve want to buy $75 worth of no tokens 
+        vm.startPrank(eve);
+        IERC20(collateralToken).approve(address(factory), 75*10**6);
+        uint256 prevBalance1 = IERC20(collateralToken).balanceOf(address(factory));
+        factory.mintDecisionTokens(conditionId, 75*10**6, noTokenId);
+        uint256 eveNoBalance = factory.balanceOf(eve, noTokenId);
+        console2.log("NO token balance of eve (in 18 decimals): ", eveNoBalance);
+        assertEq(IERC20(collateralToken).balanceOf(address(factory)) - prevBalance1, 75*10**6);
+        vm.stopPrank();
+
+        uint256 totalYesSupply = factory.totalSupply(yesTokenId);
+        uint256 totalNoSupply = factory.totalSupply(noTokenId);
+
+        console2.log("Total supply of YES token (in 18 decimals): ", totalYesSupply);
+        console2.log("Total supply of NO token (in 18 decimals): ", totalNoSupply);
     }
 
     function test_buyingDecisionTokens() public {}

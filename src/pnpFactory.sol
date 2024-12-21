@@ -42,9 +42,9 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
 
     mapping(bytes32 => address) public collateralToken;
 
-    mapping(bytes32 => uint256) public winningTokenId; // Maps conditionId to winning tokenId
+    mapping(bytes32 => uint256) public winningTokenId; 
 
-    mapping(bytes32 => address) public conditionIdToPool; // New mapping to store pool addresses
+    mapping(bytes32 => address) public conditionIdToPool; 
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS

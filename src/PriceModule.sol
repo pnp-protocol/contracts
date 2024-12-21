@@ -14,10 +14,6 @@ import {IUniswapV3Pool} from "lib/v3-core/contracts/interfaces/IUniswapV3Pool.so
 // for uniswap V3 Pools
 contract PriceModule is ITruthModule {
 
-    // Function to set settling time for a market
-    function setSettlingTime(bytes32 conditionId, uint256 _settlingTime) external {
-        require(_settlingTime > block.timestamp, "Settling time must be in future");
-    }
 
     // Function to fetch the price of a token from Uniswap V3 Pool
     // gives price of B in terms of A 

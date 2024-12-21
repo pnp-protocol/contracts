@@ -12,6 +12,8 @@ import {ITruthModule} from "./interfaces/ITruthModule.sol";
 import {IUniswapV3Pool} from "lib/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
 // for uniswap V3 Pools
+// For market questions like:
+// Will token [X trade over $[Y] by [Z.timestamp]
 contract PriceModule is ITruthModule {
 
 
@@ -51,14 +53,20 @@ contract PriceModule is ITruthModule {
     }
 
     // Function to settle the market
-    function settle(
-        bytes32 conditionId,
-        uint256 targetPrice,
-        address poolAddress
-    ) external override returns (uint256 winningTokenId) {
-        // Your existing settlement logic
-        winningTokenId = uint256(
-            keccak256(abi.encodePacked(conditionId, "YES"))
-        );
+    function settle(bytes32 conditionId, uint256 targetPrice, address pool) external view override returns (uint256) {
+        // Get current price from the pool
+        uint256 currentPrice = getPrice(IUniswapV3Pool(pool));
+        
+        // Construct token IDs using keccak256
+        uint256 yesTokenId = uint256(keccak256(abi.encodePacked(conditionId, "YES")));
+        uint256 noTokenId = uint256(keccak256(abi.encodePacked(conditionId, "NO")));
+        
+        // Compare with target price from marketParams
+        // marketParams[1] is the target price
+        if (currentPrice >= targetPrice) {
+            return yesTokenId; // YES token wins
+        } else {
+            return noTokenId; // NO token wins
+        }
     }
 }

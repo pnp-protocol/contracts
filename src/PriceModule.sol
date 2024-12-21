@@ -13,20 +13,14 @@ import {IUniswapV3Pool} from "lib/v3-core/contracts/interfaces/IUniswapV3Pool.so
 
 // for uniswap V3 Pools
 contract PriceModule is ITruthModule {
-    // State variable for settling time
-    mapping(bytes32 => uint256) public settlingTime;
-    
-    // Event to emit when settling time is set
-    event SettlingTimeSet(bytes32 indexed conditionId, uint256 time);
-    
+
     // Function to set settling time for a market
     function setSettlingTime(bytes32 conditionId, uint256 _settlingTime) external {
         require(_settlingTime > block.timestamp, "Settling time must be in future");
-        settlingTime[conditionId] = _settlingTime;
-        emit SettlingTimeSet(conditionId, _settlingTime);
     }
 
     // Function to fetch the price of a token from Uniswap V3 Pool
+    // gives price of B in terms of A 
     function getPrice(IUniswapV3Pool pool) public view returns (uint256 price) {
         (uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
         
@@ -56,19 +50,16 @@ contract PriceModule is ITruthModule {
 
         // // ETH price should be roughly between 1000-5000 USDC
         // assertTrue(price >= 1000e6 && price <= 5000e6, "Price outside reasonable range");
-
-        
+   
         return price;
     }
 
     // Function to settle the market
     function settle(
         bytes32 conditionId,
-        uint256[] memory _marketParams
+        uint256 targetPrice,
+        address poolAddress
     ) external override returns (uint256 winningTokenId) {
-        require(block.timestamp >= settlingTime[conditionId], "Market not ready for settlement");
-        require(settlingTime[conditionId] > 0, "Settling time not set");
-        
         // Your existing settlement logic
         winningTokenId = uint256(
             keccak256(abi.encodePacked(conditionId, "YES"))

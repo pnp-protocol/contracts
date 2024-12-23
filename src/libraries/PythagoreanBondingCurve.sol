@@ -91,21 +91,23 @@ library PythagoreanBondingCurve {
         require(tokensToBurn > 0, "Must burn positive amount");
         require(tokensToBurn <= a, "Cannot burn more than supply");
 
+        uint256 SCALE = 1e18;
+
         // Calculate the constant c = r² / (a² + b²)
-        uint256 c = (r * r) / (a * a + b * b);
+        uint256 c = (r * r) / ((a * a + b * b) / SCALE);
 
         // Calculate new supply after burning
         uint256 newSupply = a - tokensToBurn;
 
         // Calculate current reserve based on current supplies
-        uint256 currentReserveSquared = c * (a * a + b * b);
+        uint256 currentReserveSquared = c * ((a * a + b * b) / SCALE);
 
         // Calculate new reserve based on new supplies
-        uint256 newReserveSquared = c * (newSupply * newSupply + b * b);
+        uint256 newReserveSquared = c * ((newSupply * newSupply + b * b) / SCALE);
 
         // The reserve to release is the difference between current and new reserves
-        uint256 currentReserve = sqrt(currentReserveSquared);
-        uint256 newReserve = sqrt(newReserveSquared);
+        uint256 currentReserve = sqrt(currentReserveSquared * SCALE);
+        uint256 newReserve = sqrt(newReserveSquared * SCALE);
 
         reserveToRelease = currentReserve - newReserve;
 
@@ -121,12 +123,14 @@ library PythagoreanBondingCurve {
         // Ensure we don't divide by zero
         require(a * a + b * b > 0, "Invalid token supplies");
 
+        uint256 SCALE = 1e18;
+
         // Calculate the constant c = r² / (a² + b²)
-        uint256 c = (r * r) / (a * a + b * b);
+        uint256 c = (r * r) / ((a * a + b * b) / SCALE);
 
         // The price is determined by the derivative of the bonding curve
         // For Pythagorean curve: price = c * a / sqrt(a² + b²)
-        uint256 denominator = sqrt(a * a + b * b);
+        uint256 denominator = sqrt((a * a + b * b) / SCALE);
         require(denominator > 0, "Invalid denominator");
 
         price = (c * a) / denominator;

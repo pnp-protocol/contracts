@@ -125,16 +125,20 @@ contract FactoryTest is Test {
         
         assertEq(factory.balanceOf(alice, yesTokenId), scaledInitialLiquidity);
         assertEq(factory.balanceOf(alice, noTokenId), scaledInitialLiquidity);
+        console2.log("alice now has a total of ", scaledInitialLiquidity, " YES and NO tokens");
 
         vm.startPrank(bob);
         // bob wants to buy $100 worth of yes tokens 
+        console2.log("now bob wants to buy $100 worth of yes tokens");
+        console2.log("previous Balance of yes tokens of bob: ", factory.balanceOf(bob, yesTokenId));
         IERC20(collateralToken).approve(address(factory), 100*10**6);
         uint256 prevBalance = IERC20(collateralToken).balanceOf(address(factory));
         factory.mintDecisionTokens(conditionId, 100*10**6, yesTokenId);
         uint256 bobYesBalance = factory.balanceOf(bob, yesTokenId);
-        console2.log("YES token balance of bob (in 18 decimals): ", bobYesBalance);
+        console2.log("current YES token balance of bob after minting $100 worth of tokens:", bobYesBalance); 
         assertEq(IERC20(collateralToken).balanceOf(address(factory)) - prevBalance, 100*10**6);
         vm.stopPrank();
+
 
         // console log out the price of YES and NO tokens 
         uint256 marketReserve = factory.marketReserve(conditionId);
@@ -158,6 +162,16 @@ contract FactoryTest is Test {
 
         console2.log("Total supply of YES token (in 18 decimals): ", totalYesSupply);
         console2.log("Total supply of NO token (in 18 decimals): ", totalNoSupply);
+
+        // at the end 
+        // totalSupply of YES * price of yes + totalSupply of NO * price of no = marketReserve
+        // let's assert these 
+        uint256 a = totalYesSupply * PythagoreanBondingCurve.getPrice(marketReserve, totalYesSupply, totalNoSupply);
+        
+        uint256 b = totalNoSupply * PythagoreanBondingCurve.getPrice(marketReserve, totalNoSupply, totalYesSupply);
+        
+        console2.log(a+b);
+        console2.log(marketReserve);
     }
 
     function test_buyingDecisionTokens() public {}

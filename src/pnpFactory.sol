@@ -41,11 +41,13 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
 
     uint256 constant DECISION_TOKEN_DECIMALS = 18;
 
+    uint256 constant TAKE_FEE = 100; // take 1% fees ( in bps )
+
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    event PnpMarketCreated(bytes32 indexed conditionId);
+    event PnpMarketCreated(bytes32 indexed conditionId, address indexed marketCreator);
     event DecisionTokensMinted(bytes32 indexed conditionId, uint256 tokenId, address indexed minter, uint256 amount);
     event DecisionTokenBurned(bytes32 indexed conditionId, uint256 tokenId, address indexed burner, uint256 amount); 
     event PositionRedeemed(address indexed user, bytes32 indexed conditionId, uint256 amount);
@@ -130,7 +132,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         _mint(msg.sender, yesTokenId, scaledLiquidity, ""); // Mint YES tokens
         _mint(msg.sender, noTokenId, scaledLiquidity, ""); // Mint NO tokens
 
-        emit PnpMarketCreated(conditionId); // Emit event for market creation
+        emit PnpMarketCreated(conditionId, msg.sender); // Emit event for market creation
         return conditionId;
     }
 
@@ -142,7 +144,15 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         
         // Get collateral token decimals and scale amount
         uint256 collateralDecimals = IERC20Metadata(collateralToken[conditionId]).decimals();
-        uint256 scaledAmount = (collateralAmount * 10**DECISION_TOKEN_DECIMALS) / 10**collateralDecimals;
+        
+        // Calculate full scaled amount for reserve tracking
+        uint256 scaledFullAmount = (collateralAmount * 10**DECISION_TOKEN_DECIMALS) / 10**collateralDecimals;
+        
+        // Calculate amount after taking 1% fee (TAKE_FEE is in bps, so divide by 10000)
+        uint256 amountAfterFee = collateralAmount * (10000 - TAKE_FEE) / 10000;
+        
+        // Scale the amount after fee for token calculations
+        uint256 scaledAmount = (amountAfterFee * 10**DECISION_TOKEN_DECIMALS) / 10**collateralDecimals;
 
         // Get current scaled reserves and supplies
         uint256 scaledReserve = marketReserve[conditionId];
@@ -174,8 +184,8 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         // Transfer the actual token amount (unscaled)
         IERC20(collateralToken[conditionId]).transferFrom(msg.sender, address(this), collateralAmount);
         
-        // Update scaled reserve
-        marketReserve[conditionId] = scaledReserve + scaledAmount;
+        // Update scaled reserve with full amount
+        marketReserve[conditionId] = scaledReserve + scaledFullAmount;
         
         // Mint the decision tokens (already in 18 decimals)
         _mint(msg.sender, tokenIdToMint, tokensToMint, "");

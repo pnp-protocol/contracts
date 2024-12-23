@@ -86,9 +86,10 @@ contract FactoryTest is Test {
 
         // now he calls our contract with config params
         address tokenInQuestion = bettingToken; // eth  
-        uint256 initialLiquidity = 100*10**6; // 100 usdc
-        uint8 moduleId = 0; // price module
-        
+        uint256 initialLiquidity = 100*10**6;
+        uint256 collateralDecimals = IERC20Metadata(collateralToken).decimals();
+        uint256 scaledInitialLiquidity = (initialLiquidity * 10**18) / 10**collateralDecimals;
+
         uint256[] memory marketParams = new uint256[](2);
         marketParams[0] = block.timestamp + 15; // 15 blocks later
 
@@ -98,7 +99,7 @@ contract FactoryTest is Test {
         marketParams[1] = targetPrice;
 
         uint256 gasStart = gasleft();
-        bytes32 conditionId = factory.createPredictionMarket(initialLiquidity, tokenInQuestion, moduleId, collateralToken, marketParams, pool);
+        bytes32 conditionId = factory.createPredictionMarket(initialLiquidity, tokenInQuestion, 0, collateralToken, marketParams, pool);
         uint256 gasSpent = gasStart - gasleft();
         // console2.log("Prediction market created with conditionId: ");
         // console2.log(conditionId);
@@ -106,11 +107,9 @@ contract FactoryTest is Test {
         vm.stopPrank();
 
         // we assert the mappings for the market 
-        assertEq(factory.moduleTypeUsed(conditionId), moduleId);
+        assertEq(factory.moduleTypeUsed(conditionId), 0);
         
         // Scale the assertions according to decimals
-        uint256 collateralDecimals = IERC20Metadata(collateralToken).decimals();
-        uint256 scaledInitialLiquidity = (initialLiquidity * 10**18) / 10**collateralDecimals;
         uint256 scaledTargetPrice = (targetPrice * 10**18) / 10**collateralDecimals;
         
         assertEq(factory.marketParams(conditionId, 0), block.timestamp + 15);
@@ -125,16 +124,20 @@ contract FactoryTest is Test {
         
         assertEq(factory.balanceOf(alice, yesTokenId), scaledInitialLiquidity);
         assertEq(factory.balanceOf(alice, noTokenId), scaledInitialLiquidity);
+        console2.log("alice now has a total of ", scaledInitialLiquidity, " YES and NO tokens");
 
         vm.startPrank(bob);
         // bob wants to buy $100 worth of yes tokens 
+        console2.log("now bob wants to buy $100 worth of yes tokens");
+        console2.log("previous Balance of yes tokens of bob: ", factory.balanceOf(bob, yesTokenId));
         IERC20(collateralToken).approve(address(factory), 100*10**6);
         uint256 prevBalance = IERC20(collateralToken).balanceOf(address(factory));
         factory.mintDecisionTokens(conditionId, 100*10**6, yesTokenId);
         uint256 bobYesBalance = factory.balanceOf(bob, yesTokenId);
-        console2.log("YES token balance of bob (in 18 decimals): ", bobYesBalance);
+        console2.log("current YES token balance of bob after minting $100 worth of tokens:", bobYesBalance); 
         assertEq(IERC20(collateralToken).balanceOf(address(factory)) - prevBalance, 100*10**6);
         vm.stopPrank();
+
 
         // console log out the price of YES and NO tokens 
         uint256 marketReserve = factory.marketReserve(conditionId);
@@ -158,6 +161,20 @@ contract FactoryTest is Test {
 
         console2.log("Total supply of YES token (in 18 decimals): ", totalYesSupply);
         console2.log("Total supply of NO token (in 18 decimals): ", totalNoSupply);
+
+        // at the end 
+        // totalSupply of YES * price of yes + totalSupply of NO * price of no = marketReserve
+        // let's assert these 
+        uint256 SCALE = 1e18;
+        
+        uint256 priceYes = PythagoreanBondingCurve.getPrice(marketReserve, totalYesSupply, totalNoSupply);
+        uint256 priceNo = PythagoreanBondingCurve.getPrice(marketReserve, totalNoSupply, totalYesSupply);
+        
+        uint256 a = (totalYesSupply * priceYes) / SCALE;  // Divide by SCALE since price is in 18 decimals
+        uint256 b = (totalNoSupply * priceNo) / SCALE;    // Divide by SCALE since price is in 18 decimals
+        
+        console2.log(a + b);
+        console2.log(marketReserve);
     }
 
     function test_buyingDecisionTokens() public {}

@@ -106,58 +106,57 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         // Get collateral token decimals
         uint256 collateralDecimals = IERC20Metadata(_collateralToken).decimals();
         
-        // Scale initial liquidity to 18 decimals for consistent math
-        // If USDC (6 decimals) sends 100 USDC, this converts to 100 * 10^18
-        uint256 scaledLiquidity = (_initialLiquidity * 10**DECISION_TOKEN_DECIMALS) / 10**collateralDecimals;
+        // Scale initial liquidity to 18 decimals consistently
+        uint256 scaledLiquidity = scaleTo18Decimals(_initialLiquidity, collateralDecimals);
 
         // Transfer the actual token amount (unscaled)
         IERC20Metadata(_collateralToken).transferFrom(msg.sender, address(this), _initialLiquidity);
         
-        // Generate condition ID
         bytes32 conditionId = keccak256(abi.encodePacked(_tokenInQuestion, _marketParams));
 
-        // Store market parameters
+        // Store market parameters with scaled liquidity
         moduleTypeUsed[conditionId] = _moduleId;
         marketParams[conditionId] = _marketParams;
         marketSettled[conditionId] = false;
-        marketReserve[conditionId] = scaledLiquidity; // Store scaled liquidity
+        marketReserve[conditionId] = scaledLiquidity;  // Store scaled liquidity
         collateralToken[conditionId] = _collateralToken;
         conditionIdToPool[conditionId] = _pool;
 
-        // Derive token IDs for YES and NO
         uint256 yesTokenId = uint256(keccak256(abi.encodePacked(conditionId, "YES")));
         uint256 noTokenId = uint256(keccak256(abi.encodePacked(conditionId, "NO")));
         
-        // Mint YES and NO tokens using scaled liquidity
-        _mint(msg.sender, yesTokenId, scaledLiquidity, ""); // Mint YES tokens
-        _mint(msg.sender, noTokenId, scaledLiquidity, ""); // Mint NO tokens
+        // Mint tokens with scaled amounts
+        _mint(msg.sender, yesTokenId, scaledLiquidity, "");
+        _mint(msg.sender, noTokenId, scaledLiquidity, "");
 
-        emit PnpMarketCreated(conditionId, msg.sender); // Emit event for market creation
+        emit PnpMarketCreated(conditionId, msg.sender);
         return conditionId;
     }
 
-    // Function to mint decision tokens
+    function scaleTo18Decimals(uint256 amount, uint256 tokenDecimals) internal pure returns (uint256) {
+        return (amount * 10**18) / 10**tokenDecimals;
+    }
+
+    function scaleFrom18Decimals(uint256 amount, uint256 tokenDecimals) internal pure returns (uint256) {
+        return (amount * 10**tokenDecimals) / 10**18;
+    }
+
     function mintDecisionTokens(bytes32 conditionId, uint256 collateralAmount, uint256 tokenIdToMint) public nonReentrant {
         if(block.timestamp > marketParams[conditionId][0]) {
             revert MarketTradingStopped();
         }
         
-        // Get collateral token decimals and scale amount
         uint256 collateralDecimals = IERC20Metadata(collateralToken[conditionId]).decimals();
         
-        // Calculate full scaled amount for reserve tracking
-        uint256 scaledFullAmount = (collateralAmount * 10**DECISION_TOKEN_DECIMALS) / 10**collateralDecimals;
+        // Scale collateral amount to 18 decimals
+        uint256 scaledFullAmount = scaleTo18Decimals(collateralAmount, collateralDecimals);
         
-        // Calculate amount after taking 1% fee (TAKE_FEE is in bps, so divide by 10000)
-        uint256 amountAfterFee = collateralAmount * (10000 - TAKE_FEE) / 10000;
-        
-        // Scale the amount after fee for token calculations
-        uint256 scaledAmount = (amountAfterFee * 10**DECISION_TOKEN_DECIMALS) / 10**collateralDecimals;
+        // Calculate fee and scale it
+        uint256 amountAfterFee = (collateralAmount * (10000 - TAKE_FEE)) / 10000;
+        uint256 scaledAmount = scaleTo18Decimals(amountAfterFee, collateralDecimals);
 
-        // Get current scaled reserves and supplies
         uint256 scaledReserve = marketReserve[conditionId];
         
-        // Calculate token supplies (already in 18 decimals as we mint them that way)
         uint256 yesTokenId = uint256(keccak256(abi.encodePacked(conditionId, "YES")));
         uint256 noTokenId = uint256(keccak256(abi.encodePacked(conditionId, "NO")));
         
@@ -181,45 +180,64 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
             );
         }
 
-        // Transfer the actual token amount (unscaled)
+        // Transfer unscaled amount
         IERC20(collateralToken[conditionId]).transferFrom(msg.sender, address(this), collateralAmount);
         
-        // Update scaled reserve with full amount
+        // Update reserve with scaled amount
         marketReserve[conditionId] = scaledReserve + scaledFullAmount;
         
-        // Mint the decision tokens (already in 18 decimals)
+        // Mint decision tokens (already in 18 decimals)
         _mint(msg.sender, tokenIdToMint, tokensToMint, "");
 
-        emit DecisionTokensMinted(conditionId, tokenIdToMint, msg.sender, collateralAmount);
+        emit DecisionTokensMinted(conditionId, tokenIdToMint, msg.sender, tokensToMint);
     }
 
-    // Function to burn decision tokens
     function burnDecisionTokens(bytes32 conditionId, uint256 tokenIdToBurn, uint256 tokensToBurn) public nonReentrant {
         if(block.timestamp > marketParams[conditionId][0]) {
             revert MarketTradingStopped();
         }
-        // check if balance of tokenIdToBurn is greater than tokensToBurn
-        require(balanceOf(msg.sender, tokenIdToBurn) >= tokensToBurn, "Not enough tokens to burn");
 
-        uint256 r = marketReserve[conditionId];
-        uint256 a = totalSupply(tokenIdToBurn);
-        uint256 b = totalSupply(tokenIdToBurn == uint256(keccak256(abi.encodePacked(conditionId, "YES"))) ? 
-        uint256(keccak256(abi.encodePacked(conditionId, "NO"))) : 
-        uint256(keccak256(abi.encodePacked(conditionId, "YES"))));
+        require(balanceOf(msg.sender, tokenIdToBurn) >= tokensToBurn, "Insufficient balance");
+        
+        uint256 yesTokenId = uint256(keccak256(abi.encodePacked(conditionId, "YES")));
+        uint256 noTokenId = uint256(keccak256(abi.encodePacked(conditionId, "NO")));
+        
+        uint256 yesSupply = totalSupply(yesTokenId);
+        uint256 noSupply = totalSupply(noTokenId);
+        
+        uint256 scaledReserve = marketReserve[conditionId];
+        
+        uint256 reserveToRelease;
+        if (tokenIdToBurn == yesTokenId) {
+            reserveToRelease = PythagoreanBondingCurve.getReserveToRelease(
+                scaledReserve,
+                yesSupply,
+                noSupply,
+                tokensToBurn
+            );
+        } else {
+            reserveToRelease = PythagoreanBondingCurve.getReserveToRelease(
+                scaledReserve,
+                noSupply,
+                yesSupply,
+                tokensToBurn
+            );
+        }
 
-        uint256 reserveToRelease = PythagoreanBondingCurve.getReserveToRelease(r, a, b, tokenIdToBurn);
-
-        // Burn the respective number of tokens from msg.sender
+        // Scale down reserve before transfer
+        uint256 collateralDecimals = IERC20Metadata(collateralToken[conditionId]).decimals();
+        uint256 unscaledReserve = scaleFrom18Decimals(reserveToRelease, collateralDecimals);
+        
+        // Burn tokens first (safety first!)
         _burn(msg.sender, tokenIdToBurn, tokensToBurn);
-
-        // Transfer the reserve to msg.sender
-        IERC20(collateralToken[conditionId]).transfer(msg.sender, reserveToRelease);
-
-        // Update market reserve
-        marketReserve[conditionId] -= reserveToRelease;
+        
+        // Update scaled reserve
+        marketReserve[conditionId] = scaledReserve - reserveToRelease;
+        
+        // Transfer unscaled amount
+        IERC20(collateralToken[conditionId]).transfer(msg.sender, unscaledReserve);
 
         emit DecisionTokenBurned(conditionId, tokenIdToBurn, msg.sender, tokensToBurn);
-               
     }
 
     // Function to settle the market

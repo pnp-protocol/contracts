@@ -15,9 +15,7 @@ def getTokensToMint(r: float, a: float, b: float, l: float) -> float:
         Amount of tokens to mint
     """
     # First calculate c (the constant) from current state
-    # c = r^2 / (a^2 + b^2)
     if a == 0 and b == 0:
-        # Initial state, set c directly from first liquidity
         c = l
     else:
         c = r / math.sqrt(a * a + b * b)
@@ -25,36 +23,44 @@ def getTokensToMint(r: float, a: float, b: float, l: float) -> float:
     # Calculate new reserve after adding liquidity
     new_r = r + l
     
-    # Using the equation R = c * sqrt(a_new^2 + b^2)
-    # where a_new = a + tokens_to_mint
-    # Solve for tokens_to_mint:
-    # new_r = c * sqrt((a + tokens_to_mint)^2 + b^2)
-    # (new_r/c)^2 = (a + tokens_to_mint)^2 + b^2
-    # tokens_to_mint = sqrt((new_r/c)^2 - b^2) - a
-    
     tokens_to_mint = math.sqrt((new_r/c) * (new_r/c) - b * b) - a
     return tokens_to_mint
+
+def getReserveToRelease(r: float, a: float, b: float, tokens_to_burn: float) -> float:
+    """
+    Calculate the amount of reserve to release when burning tokens
+    
+    Args:
+        r: Current reserve amount
+        a: Current supply of token A (the one being burned)
+        b: Current supply of token B
+        tokens_to_burn: Number of A tokens to burn
+    
+    Returns:
+        Amount of reserve to release
+    """
+    assert tokens_to_burn <= a, "Cannot burn more tokens than supply"
+    assert tokens_to_burn > 0, "Must burn positive amount"
+    
+    # Calculate c from current state
+    c = r / math.sqrt(a * a + b * b)
+    
+    # Calculate new supply after burning
+    new_a = a - tokens_to_burn
+    
+    # Calculate current and new reserves
+    current_reserve = r
+    new_reserve = c * math.sqrt(new_a * new_a + b * b)
+    
+    # Amount to release is the difference
+    return current_reserve - new_reserve
 
 def getPrice(r: float, a: float, b: float) -> float:
     """
     Calculate the current price of token A based on the bonding curve
     Price is the derivative of the reserve with respect to token supply
-    
-    Args:
-        r: Current reserve amount
-        a: Current supply of token A
-        b: Current supply of token B
-    
-    Returns:
-        Current price of token A
     """
-    # From R = c * sqrt(a^2 + b^2)
-    # First calculate c = R/sqrt(a^2 + b^2)
     c = r / math.sqrt(a * a + b * b)
-    
-    # Price is dR/da = c * a/sqrt(a^2 + b^2)
-    # Substituting c = R/sqrt(a^2 + b^2)
-    # Price = R * a/(a^2 + b^2)
     price = r * a / (a * a + b * b)
     return price
 
@@ -101,4 +107,29 @@ if __name__ == "__main__":
     # Update state
     r = r + l
     b = b + tokens_to_mint
+    check_invariant(r, a, b)
+
+    print("Case 4: Bob burns half his YES tokens")
+    print("====================================")
+    # Calculate Bob's position
+    bob_yes_tokens = tokens_to_mint  # from Case 2
+    tokens_to_burn = bob_yes_tokens / 2
+    reserve_to_release = getReserveToRelease(r, a, b, tokens_to_burn)
+    print(f"Bob burns {tokens_to_burn:.6f} YES tokens and receives {reserve_to_release:.6f} dollars")
+    
+    # Update state
+    r = r - reserve_to_release
+    a = a - tokens_to_burn
+    check_invariant(r, a, b)
+
+    print("Case 5: Eve burns all her NO tokens")
+    print("===================================")
+    # Calculate Eve's position
+    eve_no_tokens = tokens_to_mint  # from Case 3
+    reserve_to_release = getReserveToRelease(r, b, a, eve_no_tokens)  # Note: b and a swapped for NO tokens
+    print(f"Eve burns {eve_no_tokens:.6f} NO tokens and receives {reserve_to_release:.6f} dollars")
+    
+    # Update state
+    r = r - reserve_to_release
+    b = b - eve_no_tokens
     check_invariant(r, a, b)

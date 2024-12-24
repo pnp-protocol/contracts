@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Test, console2, Vm} from "../lib/forge-std/src/Test.sol";
-import {PNPFactory} from "../src/PNPFactory.sol";
+import {PNPFactory} from "../src/pnpFactory.sol";
 import {PythagoreanBondingCurve} from "../src/libraries/PythagoreanBondingCurve.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";

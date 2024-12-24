@@ -15,16 +15,14 @@ import {IUniswapV3Pool} from "lib/v3-core/contracts/interfaces/IUniswapV3Pool.so
 // For market questions like:
 // Will token [X trade over $[Y] by [Z.timestamp]
 contract PriceModule is ITruthModule {
-
-
     // Function to fetch the price of a token from Uniswap V3 Pool
-    // gives price of B in terms of A 
+    // gives price of B in terms of A
     function getPrice(IUniswapV3Pool pool) public view returns (uint256 price) {
-        (uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
-        
+        (uint160 sqrtPriceX96,,,,,,) = pool.slot0();
+
         // Ensure the price is not zero
         require(sqrtPriceX96 > 0, "Invalid price");
-        
+
         // For ETH/USDC pool:
         // 1. Square the sqrtPriceX96
         uint256 numerator = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
@@ -48,7 +46,7 @@ contract PriceModule is ITruthModule {
 
         // // ETH price should be roughly between 1000-5000 USDC
         // assertTrue(price >= 1000e6 && price <= 5000e6, "Price outside reasonable range");
-   
+
         return price;
     }
 
@@ -56,11 +54,11 @@ contract PriceModule is ITruthModule {
     function settle(bytes32 conditionId, uint256 targetPrice, address pool) external view override returns (uint256) {
         // Get current price from the pool
         uint256 currentPrice = getPrice(IUniswapV3Pool(pool));
-        
+
         // Construct token IDs using keccak256
         uint256 yesTokenId = uint256(keccak256(abi.encodePacked(conditionId, "YES")));
         uint256 noTokenId = uint256(keccak256(abi.encodePacked(conditionId, "NO")));
-        
+
         // Compare with target price from marketParams
         // marketParams[1] is the target price
         if (currentPrice >= targetPrice) {

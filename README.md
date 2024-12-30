@@ -1,5 +1,6 @@
 ----- Design of pnp smart contracts -----
 
+- stick a diagram of modular design here and link to how it works docs
 ### PNP-Factory.sol
 #### erc1155 part
 This contract inherits ERC1155 token standard from openzeppelin with vanilla implementation.

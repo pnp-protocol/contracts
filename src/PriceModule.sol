@@ -8,12 +8,23 @@ pragma solidity ^0.8.20;
 // ██║░░░░░██║░╚███║██║░░░░░  ██║░░░░░██║░░██║╚█████╔╝░░░██║░░░╚█████╔╝╚█████╔╝╚█████╔╝███████╗
 // ╚═╝░░░░░╚═╝░░╚══╝╚═╝░░░░░  ╚═╝░░░░░╚═╝░░╚═╝░╚════╝░░░░╚═╝░░░░╚════╝░░╚════╝░░╚════╝░╚══════╝
 
+
+// ███╗░░░███╗░█████╗░██████╗░██╗░░░██╗██╗░░░░░███████╗  ░░░░░░  ░░███╗░░
+// ████╗░████║██╔══██╗██╔══██╗██║░░░██║██║░░░░░██╔════╝  ░░░░░░  ░████║░░
+// ██╔████╔██║██║░░██║██║░░██║██║░░░██║██║░░░░░█████╗░░  █████╗  ██╔██║░░
+// ██║╚██╔╝██║██║░░██║██║░░██║██║░░░██║██║░░░░░██╔══╝░░  ╚════╝  ╚═╝██║░░
+// ██║░╚═╝░██║╚█████╔╝██████╔╝╚██████╔╝███████╗███████╗  ░░░░░░  ███████╗
+// ╚═╝░░░░░╚═╝░╚════╝░╚═════╝░░╚═════╝░╚══════╝╚══════╝  ░░░░░░  ╚══════╝
+
+
 import {ITruthModule} from "./interfaces/ITruthModule.sol";
 import {IUniswapV3Pool} from "lib/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
-// for uniswap V3 Pools
+// for Uniswap V3 Pools
 // For market questions like:
-// Will token [X trade over $[Y] by [Z.timestamp]
+// Will token [X] reach [Y] by the end of [Z]?
+
+
 contract PriceModule is ITruthModule {
     // Function to fetch the price of a token from Uniswap V3 Pool
     // gives price of B in terms of A

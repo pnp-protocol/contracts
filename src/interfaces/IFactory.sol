@@ -49,4 +49,5 @@ interface IFactory {
     function collateralToken(bytes32 conditionId) external view returns (address);
     function winningTokenId(bytes32 conditionId) external view returns (uint256);
     function conditionIdToPool(bytes32 conditionId) external view returns (address);
+
 }

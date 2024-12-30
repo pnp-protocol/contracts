@@ -242,20 +242,29 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
 
     // Function to redeem position
     function redeemPosition(bytes32 conditionId) public {
-        require(winningTokenId[conditionId] != 0, "Market not settled");
         require(marketSettled[conditionId], "Market not settled");
 
         uint256 userBalance = balanceOf(msg.sender, winningTokenId[conditionId]);
+        require(userBalance > 0, "No winning tokens to redeem");
+
         uint256 totalSupplyWinningToken = totalSupply(winningTokenId[conditionId]);
 
-        uint256 reserveToRedeem = (userBalance * marketReserve[conditionId]) / totalSupplyWinningToken;
+        // Both userBalance and marketReserve are in 18 decimals
+        uint256 scaledReserveToRedeem = (userBalance * marketReserve[conditionId]) / totalSupplyWinningToken;
+        require(scaledReserveToRedeem > 0, "No reserves to redeem");
 
-        require(reserveToRedeem > 0, "No reserves to redeem");
+        // Scale down to collateral token decimals before transfer
+        uint256 collateralDecimals = IERC20Metadata(collateralToken[conditionId]).decimals();
+        uint256 reserveToRedeem = scaleFrom18Decimals(scaledReserveToRedeem, collateralDecimals);
 
         IERC20(collateralToken[conditionId]).transfer(msg.sender, reserveToRedeem);
 
         emit PositionRedeemed(msg.sender, conditionId, reserveToRedeem);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                               ADMIN FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     // Function to set module addresses, restricted to the contract owner
     function setModuleAddress(uint8 moduleType, address moduleAddr) external onlyOwner {

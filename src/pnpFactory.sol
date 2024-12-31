@@ -40,7 +40,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
 
     uint256 constant DECISION_TOKEN_DECIMALS = 18;
 
-    uint256 constant TAKE_FEE = 100; // take 1% fees ( in bps )
+    uint256 public  TAKE_FEE = 100; // take 1% fees ( in bps )
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -58,6 +58,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     error InvalidMarketEndTime(address marketCreator, uint256 endTime);
     error MarketTradingStopped();
     error InvalidAddress(address addr);
+    error InvalidTokenId(address  addr, uint256 tokenId);
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
@@ -141,6 +142,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         public
         nonReentrant
     {
+        require(collateralAmount > 0, "Invalid collateral amount");       
         if (block.timestamp > marketParams[conditionId][0]) {
             revert MarketTradingStopped();
         }
@@ -165,8 +167,11 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         uint256 tokensToMint;
         if (tokenIdToMint == yesTokenId) {
             tokensToMint = PythagoreanBondingCurve.getTokensToMint(scaledReserve, yesSupply, noSupply, scaledAmount);
-        } else {
+        } else if (tokenIdToMint == noTokenId) {
             tokensToMint = PythagoreanBondingCurve.getTokensToMint(scaledReserve, noSupply, yesSupply, scaledAmount);
+        }
+        else {
+            revert InvalidTokenId(msg.sender,tokenIdToMint);
         }
 
         // Transfer unscaled amount
@@ -185,6 +190,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         if (block.timestamp > marketParams[conditionId][0]) {
             revert MarketTradingStopped();
         }
+        require(tokensToBurn > 0, "Invalid amount");
 
         require(balanceOf(msg.sender, tokenIdToBurn) >= tokensToBurn, "Insufficient balance");
 
@@ -229,15 +235,15 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         address moduleAddr = moduleAddress[moduleTypeUsed[conditionId]];
 
         // Call the settle function from the ITruthModule interface
+        // @TODO : Add a return check if fetching uniV3 Pool fails
         uint256 settledWinningTokenId =
             ITruthModule(moduleAddr).settle(conditionId, marketParams[conditionId][1], conditionIdToPool[conditionId]);
 
         // Store the winning token ID and mark the market as settled
         winningTokenId[conditionId] = settledWinningTokenId;
         marketSettled[conditionId] = true;
-        return settledWinningTokenId;
-
         emit MarketSettled(conditionId, settledWinningTokenId, msg.sender);
+        return settledWinningTokenId;    
     }
 
     // Function to redeem position
@@ -269,6 +275,17 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     // Function to set module addresses, restricted to the contract owner
     function setModuleAddress(uint8 moduleType, address moduleAddr) external onlyOwner {
         require(moduleAddr != address(0), "Invalid address");
+        require(moduleAddress[moduleType] == address(0), "Module already set");
         moduleAddress[moduleType] = moduleAddr;
     }
+
+    function setTakeFee(uint256 _takeFee) external onlyOwner {
+        TAKE_FEE = _takeFee;
+    }
+
+    
+
 }
+
+// @TODO : Add comprehensive validation for all market parameters
+// @TODO : Consider implementing a timelock or multi-sig for critical parameter changes

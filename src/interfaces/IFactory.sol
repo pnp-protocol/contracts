@@ -36,11 +36,15 @@ interface IFactory {
 
     function burnDecisionTokens(bytes32 conditionId, uint256 tokenIdToBurn, uint256 tokensToBurn) external;
 
-    function settleMarket(bytes32 conditionId) external;
+    function settleMarket(bytes32 conditionId) external returns (uint256);
 
-    function redeemPosition(bytes32 conditionId, uint256 amount) external;
+    function redeemPosition(bytes32 conditionId) external;
 
-    // View functions--Mappings
+    function setModuleAddress(uint8 moduleType, address moduleAddr) external;
+
+    function setTakeFee(uint256 _takeFee) external;
+
+    // View functions
     function moduleTypeUsed(bytes32 conditionId) external view returns (uint8);
     function moduleAddress(uint8 moduleId) external view returns (address);
     function marketParams(bytes32 conditionId) external view returns (uint256[] memory);
@@ -49,5 +53,5 @@ interface IFactory {
     function collateralToken(bytes32 conditionId) external view returns (address);
     function winningTokenId(bytes32 conditionId) external view returns (uint256);
     function conditionIdToPool(bytes32 conditionId) external view returns (address);
-
+    function TAKE_FEE() external view returns (uint256);
 }

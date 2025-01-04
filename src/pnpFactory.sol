@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+// ██████╗░███╗░░██╗██████╗░  ██████╗░██████╗░░█████╗░████████╗░█████╗░░█████╗░░█████╗░██╗░░░░░
+// ██╔══██╗████╗░██║██╔══██╗  ██╔══██╗██╔══██╗██╔══██╗╚══██╔══╝██╔══██╗██╔══██╗██╔══██╗██║░░░░░
+// ██████╔╝██╔██╗██║██████╔╝  ██████╔╝██████╔╝██║░░██║░░░██║░░░██║░░██║██║░░╚═╝██║░░██║██║░░░░░
+// ██╔═══╝░██║╚████║██╔═══╝░  ██╔═══╝░██╔══██╗██║░░██║░░░██║░░░██║░░██║██║░░██╗██║░░██║██║░░░░░
+// ██║░░░░░██║░╚███║██║░░░░░  ██║░░░░░██║░░██║╚█████╔╝░░░██║░░░╚█████╔╝╚█████╔╝╚█████╔╝███████╗
+// ╚═╝░░░░░╚═╝░░╚══╝╚═╝░░░░░  ╚═╝░░░░░╚═╝░░╚═╝░╚════╝░░░░╚═╝░░░░╚════╝░░╚════╝░░╚════╝░╚══════╝
+
 // oz imports
 import {ERC1155Supply} from "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
@@ -16,31 +23,47 @@ import {PythagoreanBondingCurve} from "./libraries/PythagoreanBondingCurve.sol";
 import {ITruthModule} from "./interfaces/ITruthModule.sol";
 
 contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
-    // State variables
+    
 
     /// @dev Maps conditionId of a market to the truth module used
+    /// @dev ModuleId 0 for Price Markets 
+    /// @dev ModuleId 1 for Twitter Markets 
+    /// @dev Differentiated by the settling mechanism
     mapping(bytes32 => uint8) public moduleTypeUsed;
 
     /// @dev Maps moduleId to the corresponding truth module address
+    /// @dev use `setModuleAddress`
     mapping(uint8 => address) public moduleAddress;
 
     /// @dev Maps conditionId of a market to the market parameters
+    /// @dev marketParams[0] : Market end timestamp
+    /// @dev marketParams[1] : target price for `_tokenInQuestion`
     mapping(bytes32 => uint256[]) public marketParams;
 
+    /// @dev Checked when redeeming and set when settling a market
     mapping(bytes32 => bool) public marketSettled;
 
     // Mapping to track market reserves for each conditionId
+    /// @dev marketReserve is scaled to 18 Decimals nmw the collateral
     mapping(bytes32 => uint256) public marketReserve;
 
+    /// @dev Usually USDC or USDT
     mapping(bytes32 => address) public collateralToken;
 
+    /// @dev uint256(keccak256(abi.encodePacked(conditionId, "YES" | "NO" )));
     mapping(bytes32 => uint256) public winningTokenId;
 
-    mapping(bytes32 => address) public conditionIdToPool;
+    /// @dev this address passed into NANI_CTC
+    mapping(bytes32 => address) public tokenInQuestion;
 
+    /// @dev YES | NO tokens are scaled with 18 decimals
     uint256 constant DECISION_TOKEN_DECIMALS = 18;
 
-    uint256 public  TAKE_FEE = 100; // take 1% fees ( in bps )
+    /// @dev Charged when minting 
+    /// @dev Fees goes to winning token holders
+    /// @dev To become LP, buy both YES and NO tokens to be eligible for claimable fees
+    uint256 public TAKE_FEE = 100; // take 1% fees ( in bps )
+
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -58,7 +81,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     error InvalidMarketEndTime(address marketCreator, uint256 endTime);
     error MarketTradingStopped();
     error InvalidAddress(address addr);
-    error InvalidTokenId(address  addr, uint256 tokenId);
+    error InvalidTokenId(address addr, uint256 tokenId);
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
@@ -90,8 +113,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         address _tokenInQuestion,
         uint8 _moduleId,
         address _collateralToken,
-        uint256[] memory _marketParams,
-        address _pool
+        uint256[] memory _marketParams
     ) external nonReentrant returns (bytes32) {
         require(_initialLiquidity % 2 == 0 && _initialLiquidity != 0, "Invalid liquidity");
 
@@ -115,9 +137,9 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         moduleTypeUsed[conditionId] = _moduleId;
         marketParams[conditionId] = _marketParams;
         marketSettled[conditionId] = false;
+        tokenInQuestion[conditionId] = _tokenInQuestion;
         marketReserve[conditionId] = scaledLiquidity; // Store scaled liquidity
         collateralToken[conditionId] = _collateralToken;
-        conditionIdToPool[conditionId] = _pool;
 
         uint256 yesTokenId = uint256(keccak256(abi.encodePacked(conditionId, "YES")));
         uint256 noTokenId = uint256(keccak256(abi.encodePacked(conditionId, "NO")));
@@ -142,7 +164,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         public
         nonReentrant
     {
-        require(collateralAmount > 0, "Invalid collateral amount");       
+        require(collateralAmount > 0, "Invalid collateral amount");
         if (block.timestamp > marketParams[conditionId][0]) {
             revert MarketTradingStopped();
         }
@@ -169,9 +191,8 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
             tokensToMint = PythagoreanBondingCurve.getTokensToMint(scaledReserve, yesSupply, noSupply, scaledAmount);
         } else if (tokenIdToMint == noTokenId) {
             tokensToMint = PythagoreanBondingCurve.getTokensToMint(scaledReserve, noSupply, yesSupply, scaledAmount);
-        }
-        else {
-            revert InvalidTokenId(msg.sender,tokenIdToMint);
+        } else {
+            revert InvalidTokenId(msg.sender, tokenIdToMint);
         }
 
         // Transfer unscaled amount
@@ -236,14 +257,15 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
 
         // Call the settle function from the ITruthModule interface
         // @TODO : Add a return check if fetching uniV3 Pool fails
-        uint256 settledWinningTokenId =
-            ITruthModule(moduleAddr).settle(conditionId, marketParams[conditionId][1], conditionIdToPool[conditionId]);
+        uint256 settledWinningTokenId = ITruthModule(moduleAddr).settle(
+            conditionId, tokenInQuestion[conditionId], marketParams[conditionId][1]
+        );
 
         // Store the winning token ID and mark the market as settled
         winningTokenId[conditionId] = settledWinningTokenId;
         marketSettled[conditionId] = true;
         emit MarketSettled(conditionId, settledWinningTokenId, msg.sender);
-        return settledWinningTokenId;    
+        return settledWinningTokenId;
     }
 
     // Function to redeem position
@@ -282,9 +304,6 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     function setTakeFee(uint256 _takeFee) external onlyOwner {
         TAKE_FEE = _takeFee;
     }
-
-    
-
 }
 
 // @TODO : Add comprehensive validation for all market parameters

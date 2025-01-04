@@ -8,14 +8,12 @@ pragma solidity ^0.8.20;
 // ██║░░░░░██║░╚███║██║░░░░░  ██║░░░░░██║░░██║╚█████╔╝░░░██║░░░╚█████╔╝╚█████╔╝╚█████╔╝███████╗
 // ╚═╝░░░░░╚═╝░░╚══╝╚═╝░░░░░  ╚═╝░░░░░╚═╝░░╚═╝░╚════╝░░░░╚═╝░░░░╚════╝░░╚════╝░░╚════╝░╚══════╝
 
-
 // ███╗░░░███╗░█████╗░██████╗░██╗░░░██╗██╗░░░░░███████╗  ░░░░░░  ░░███╗░░
 // ████╗░████║██╔══██╗██╔══██╗██║░░░██║██║░░░░░██╔════╝  ░░░░░░  ░████║░░
 // ██╔████╔██║██║░░██║██║░░██║██║░░░██║██║░░░░░█████╗░░  █████╗  ██╔██║░░
 // ██║╚██╔╝██║██║░░██║██║░░██║██║░░░██║██║░░░░░██╔══╝░░  ╚════╝  ╚═╝██║░░
 // ██║░╚═╝░██║╚█████╔╝██████╔╝╚██████╔╝███████╗███████╗  ░░░░░░  ███████╗
 // ╚═╝░░░░░╚═╝░╚════╝░╚═════╝░░╚═════╝░╚══════╝╚══════╝  ░░░░░░  ╚══════╝
-
 
 import {ITruthModule} from "./interfaces/ITruthModule.sol";
 import {IUniswapV3Pool} from "lib/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
@@ -24,47 +22,23 @@ import {IUniswapV3Pool} from "lib/v3-core/contracts/interfaces/IUniswapV3Pool.so
 // For market questions like:
 // Will token [X] reach [Y] by the end of [Z]?
 
+interface INANIPriceChecker {
+    function checkPrice(address token) external returns(uint256,string memory);
+}
 
 contract PriceModule is ITruthModule {
+
+    address constant private NANI_PriceChecker = 0x0000000000cDC1F8d393415455E382c30FBc0a84 ;
     // Function to fetch the price of a token from Uniswap V3 Pool
-    // gives price of B in terms of A
-    function getPrice(IUniswapV3Pool pool) public view returns (uint256 price) {
-        (uint160 sqrtPriceX96,,,,,,) = pool.slot0();
-
-        // Ensure the price is not zero
-        require(sqrtPriceX96 > 0, "Invalid price");
-
-        // For ETH/USDC pool:
-        // 1. Square the sqrtPriceX96
-        uint256 numerator = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
-
-        //console2.log("priceX192:", numerator);
-
-        // 2. Convert from Q192 to Q96 format
-        uint256 denominator = 1 << 192;
-
-        //console2.log("basePrice:", denominator);
-
-        // 3. Adjust for decimals (ETH/USDC)
-        // USDC has 6 decimals, ETH has 18 decimals
-        // We need to multiply by 10^6 (USDC decimals)
-        price = (numerator * 10 ** 12) / denominator;
-
-        //console2.log("Price:", price);
-
-        // Basic sanity check
-        //assertTrue(price > 0, "Price should be greater than 0");
-
-        // // ETH price should be roughly between 1000-5000 USDC
-        // assertTrue(price >= 1000e6 && price <= 5000e6, "Price outside reasonable range");
-
-        return price;
+    // gives price of `token` in USDC through NANI'S ctc
+    function getPriceInUSDC(address token) public  returns (uint256 price) {
+        (price, ) = INANIPriceChecker(NANI_PriceChecker).checkPrice(token);         
     }
 
     // Function to settle the market
-    function settle(bytes32 conditionId, uint256 targetPrice, address pool) external view override returns (uint256) {
+    function settle(bytes32 conditionId, address token, uint256 targetPrice) external  override returns (uint256) {
         // Get current price from the pool
-        uint256 currentPrice = getPrice(IUniswapV3Pool(pool));
+        uint256 currentPrice = getPriceInUSDC(token);
 
         // Construct token IDs using keccak256
         uint256 yesTokenId = uint256(keccak256(abi.encodePacked(conditionId, "YES")));

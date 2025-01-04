@@ -1,5 +1,8 @@
 ----- Design of pnp smart contracts -----
 
+== Price Module 0x51242F79e60e380125DE602b17E792c8eE2bcAae 
+== pnpFactory 0xeD687976873D5194b5aE6315F2c54b32AfE2456d
+
 - stick a diagram of modular design here and link to how it works docs
 ### PNP-Factory.sol
 #### erc1155 part

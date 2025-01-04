@@ -22,7 +22,7 @@ interface IFactory {
     /*//////////////////////////////////////////////////////////////
                                FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-    
+
     function createPredictionMarket(
         uint256 _initialLiquidity,
         address _tokenInQuestion,

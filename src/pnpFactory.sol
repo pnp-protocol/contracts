@@ -304,6 +304,18 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     function setTakeFee(uint256 _takeFee) external onlyOwner {
         TAKE_FEE = _takeFee;
     }
+
+    /*//////////////////////////////////////////////////////////////
+                               PUBLIC GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    function getMarketEndTime(bytes32 conditionId) public view returns (uint256) {
+        return marketParams[conditionId][0];
+    }
+
+    function getMarketTargetPrice(bytes32 conditionId) public view returns (uint256) {
+        return marketParams[conditionId][1];
+    }
 }
 
 // @TODO : Add comprehensive validation for all market parameters

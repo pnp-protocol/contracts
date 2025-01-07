@@ -35,7 +35,7 @@ contract TestMarket is Test {
 
     function setUp() public {
 
-        baseMainnetFork = vm.createFork("");
+        baseMainnetFork = vm.createFork("https://base-mainnet.g.alchemy.com/v2/krAmbFw5EvIt8P5wg3msfSlCgN4Jt7Fs");
         vm.selectFork(baseMainnetFork);
 
         // init addresses

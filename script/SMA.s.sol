@@ -22,13 +22,13 @@ contract SMAScript is Script {
         console2.log("PriceModule address:", priceModuleAddr);
 
         vm.startBroadcast(deployerKey);
-        
+
         try IFactory(factoryAddr).setModuleAddress(0, priceModuleAddr) {
             console2.log("Successfully set module address");
         } catch Error(string memory reason) {
             console2.log("Failed to set module address:", reason);
         }
-        
+
         vm.stopBroadcast();
     }
-} 
+}

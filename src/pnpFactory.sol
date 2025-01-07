@@ -23,11 +23,9 @@ import {PythagoreanBondingCurve} from "./libraries/PythagoreanBondingCurve.sol";
 import {ITruthModule} from "./interfaces/ITruthModule.sol";
 
 contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
-    
-
     /// @dev Maps conditionId of a market to the truth module used
-    /// @dev ModuleId 0 for Price Markets 
-    /// @dev ModuleId 1 for Twitter Markets 
+    /// @dev ModuleId 0 for Price Markets
+    /// @dev ModuleId 1 for Twitter Markets
     /// @dev Differentiated by the settling mechanism
     mapping(bytes32 => uint8) public moduleTypeUsed;
 
@@ -59,11 +57,10 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     /// @dev YES | NO tokens are scaled with 18 decimals
     uint256 constant DECISION_TOKEN_DECIMALS = 18;
 
-    /// @dev Charged when minting 
+    /// @dev Charged when minting
     /// @dev Fees goes to winning token holders
     /// @dev To become LP, buy both YES and NO tokens to be eligible for claimable fees
     uint256 public TAKE_FEE = 100; // take 1% fees ( in bps )
-
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -207,7 +204,11 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         emit DecisionTokensMinted(conditionId, tokenIdToMint, msg.sender, tokensToMint);
     }
 
-    function burnDecisionTokens(bytes32 conditionId, uint256 tokenIdToBurn, uint256 tokensToBurn) public nonReentrant {
+    function burnDecisionTokens(bytes32 conditionId, uint256 tokenIdToBurn, uint256 tokensToBurn)
+        public
+        nonReentrant
+        returns (uint256)
+    {
         if (block.timestamp > marketParams[conditionId][0]) {
             revert MarketTradingStopped();
         }
@@ -246,6 +247,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         IERC20(collateralToken[conditionId]).transfer(msg.sender, unscaledReserve);
 
         emit DecisionTokenBurned(conditionId, tokenIdToBurn, msg.sender, tokensToBurn);
+        return unscaledReserve;
     }
 
     // Function to settle the market
@@ -257,9 +259,8 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
 
         // Call the settle function from the ITruthModule interface
         // @TODO : Add a return check if fetching uniV3 Pool fails
-        uint256 settledWinningTokenId = ITruthModule(moduleAddr).settle(
-            conditionId, tokenInQuestion[conditionId], marketParams[conditionId][1]
-        );
+        uint256 settledWinningTokenId =
+            ITruthModule(moduleAddr).settle(conditionId, tokenInQuestion[conditionId], marketParams[conditionId][1]);
 
         // Store the winning token ID and mark the market as settled
         winningTokenId[conditionId] = settledWinningTokenId;
@@ -269,7 +270,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     }
 
     // Function to redeem position
-    function redeemPosition(bytes32 conditionId) public {
+    function redeemPosition(bytes32 conditionId) public returns (uint256) {
         require(marketSettled[conditionId], "Market not settled");
 
         uint256 userBalance = balanceOf(msg.sender, winningTokenId[conditionId]);
@@ -288,6 +289,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         IERC20(collateralToken[conditionId]).transfer(msg.sender, reserveToRedeem);
 
         emit PositionRedeemed(msg.sender, conditionId, reserveToRedeem);
+        return reserveToRedeem;
     }
 
     /*//////////////////////////////////////////////////////////////

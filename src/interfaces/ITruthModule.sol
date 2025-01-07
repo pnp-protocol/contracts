@@ -6,5 +6,7 @@ interface ITruthModule {
                                        EVENTS
     //////////////////////////////////////////////////////////////////////////*/
 
-    function settle(bytes32 conditionId, address tokenInQuestion,uint256 targetPrice) external returns (uint256 winningTokenId);
+    function settle(bytes32 conditionId, address tokenInQuestion, uint256 targetPrice)
+        external
+        returns (uint256 winningTokenId);
 }

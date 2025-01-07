@@ -1,7 +1,8 @@
 ----- Design of pnp smart contracts -----
 
-== Price Module 0x51242F79e60e380125DE602b17E792c8eE2bcAae 
-== pnpFactory 0xeD687976873D5194b5aE6315F2c54b32AfE2456d
+=== Deployment Summary ===
+  PNPFactory: 0xd40B3EbcA13E63e72D03d07C2e6a84D00aA035C2
+  PriceModule: 0xbB19494C2454E205DBF24Ce441127e5C38e5FD5A
 
 - stick a diagram of modular design here and link to how it works docs
 ### PNP-Factory.sol

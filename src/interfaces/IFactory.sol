@@ -18,6 +18,7 @@ interface IFactory {
     error InvalidMarketEndTime(address marketCreator, uint256 endTime);
     error MarketTradingStopped();
     error InvalidAddress(address addr);
+    error InvalidTokenId(address addr, uint256 tokenId);
 
     /*//////////////////////////////////////////////////////////////
                                FUNCTIONS
@@ -28,23 +29,37 @@ interface IFactory {
         address _tokenInQuestion,
         uint8 _moduleId,
         address _collateralToken,
-        uint256[] memory _marketParams,
-        address _pool
+        uint256[] memory _marketParams
     ) external returns (bytes32);
 
-    function mintDecisionTokens(bytes32 conditionId, uint256 tokenIdToMint, uint256 tokensToMint) external;
+    function mintDecisionTokens(
+        bytes32 conditionId, 
+        uint256 collateralAmount, 
+        uint256 tokenIdToMint
+    ) external returns (uint256);
 
-    function burnDecisionTokens(bytes32 conditionId, uint256 tokenIdToBurn, uint256 tokensToBurn) external;
+    function burnDecisionTokens(
+        bytes32 conditionId, 
+        uint256 tokenIdToBurn, 
+        uint256 tokensToBurn
+    ) external returns (uint256);
 
     function settleMarket(bytes32 conditionId) external returns (uint256);
 
-    function redeemPosition(bytes32 conditionId) external;
+    function redeemPosition(bytes32 conditionId) external returns (uint256);
 
     function setModuleAddress(uint8 moduleType, address moduleAddr) external;
 
     function setTakeFee(uint256 _takeFee) external;
 
-    // View functions
+    /*//////////////////////////////////////////////////////////////
+                               PUBLIC GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    function getMarketEndTime(bytes32 conditionId) external view returns (uint256);
+    function getMarketTargetPrice(bytes32 conditionId) external view returns (uint256);
+
+    // Mapping view functions
     function moduleTypeUsed(bytes32 conditionId) external view returns (uint8);
     function moduleAddress(uint8 moduleId) external view returns (address);
     function marketParams(bytes32 conditionId) external view returns (uint256[] memory);
@@ -52,6 +67,6 @@ interface IFactory {
     function marketReserve(bytes32 conditionId) external view returns (uint256);
     function collateralToken(bytes32 conditionId) external view returns (address);
     function winningTokenId(bytes32 conditionId) external view returns (uint256);
-    function conditionIdToPool(bytes32 conditionId) external view returns (address);
+    function tokenInQuestion(bytes32 conditionId) external view returns (address);
     function TAKE_FEE() external view returns (uint256);
 }

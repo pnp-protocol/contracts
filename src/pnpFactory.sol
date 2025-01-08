@@ -54,6 +54,8 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     /// @dev this address passed into NANI_CTC
     mapping(bytes32 => address) public tokenInQuestion;
 
+
+
     /// @dev YES | NO tokens are scaled with 18 decimals
     uint256 constant DECISION_TOKEN_DECIMALS = 18;
 
@@ -71,6 +73,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     event DecisionTokenBurned(bytes32 indexed conditionId, uint256 tokenId, address indexed burner, uint256 amount);
     event PositionRedeemed(address indexed user, bytes32 indexed conditionId, uint256 amount);
     event MarketSettled(bytes32 indexed conditionId, uint256 winningTokenId, address indexed user);
+    event PnpInitSettlementTwitterMarkets(bytes32 indexed conditionId);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -269,6 +272,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         return settledWinningTokenId;
     }
 
+    
     // Function to redeem position
     function redeemPosition(bytes32 conditionId) public returns (uint256) {
         require(marketSettled[conditionId], "Market not settled");
@@ -318,6 +322,82 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     function getMarketTargetPrice(bytes32 conditionId) public view returns (uint256) {
         return marketParams[conditionId][1];
     }
+
+    function getYesTokenId(bytes32 conditionId) public pure returns (uint256) {
+        return uint256(keccak256(abi.encodePacked(conditionId, "YES")));
+    }
+
+    function getNoTokenId(bytes32 conditionId) public pure returns (uint256) {
+        return uint256(keccak256(abi.encodePacked(conditionId, "NO")));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                               TWITTER MARKETS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Checks whether given conditionId is related to twitter markets or not
+    mapping(bytes32 => bool) public isTwitterMarket;
+    mapping(bytes32 => string) public twitterQuestion;
+    mapping(bytes32 => string) public twitterSettlerId;
+    mapping(bytes32 => uint256) public twitterEndTime;
+
+    event PnpTwitterMarketCreated(bytes32 indexed conditionId, address indexed marketCreator);
+
+    function initSettlementTwitterMarkets(bytes32 conditionId) public returns(bool) {
+        require(!marketSettled[conditionId], "Market already settled brother");
+        require(isTwitterMarket[conditionId], "Invalid Twitter Market ConditionId");
+        emit PnpInitSettlementTwitterMarkets(conditionId);
+        return true;
+    }
+
+    function createTwitterMarket(string memory _question, string memory settlerId, uint256 endTime, address _collateralToken, uint256 _initialLiquidity ) public returns (bytes32) {
+        require(_initialLiquidity % 2 == 0 && _initialLiquidity != 0, "Invalid liquidity");
+
+        require(_collateralToken != address(0), "Collateral must not be zero address");
+
+        if( block.timestamp > endTime ) {
+            revert InvalidMarketEndTime(msg.sender, endTime);
+        }
+
+        // Get collateral token decimals
+        uint256 collateralDecimals = IERC20Metadata(_collateralToken).decimals();
+
+        // Scale initial liquidity to 18 decimals consistently
+        uint256 scaledLiquidity = scaleTo18Decimals(_initialLiquidity, collateralDecimals);
+
+        // Transfer the actual token amount (unscaled)
+        IERC20Metadata(_collateralToken).transferFrom(msg.sender, address(this), _initialLiquidity);
+
+        bytes32 conditionId = keccak256(abi.encodePacked(_question, msg.sender, block.timestamp));
+
+        // Store market parameters with scaled liquidity
+        twitterQuestion[conditionId] = _question;
+        twitterSettlerId[conditionId] = settlerId;
+        collateralToken[conditionId] = _collateralToken;
+        twitterEndTime[conditionId] = endTime; 
+
+        uint256 yesTokenId = uint256(keccak256(abi.encodePacked(conditionId, "YES")));
+        uint256 noTokenId = uint256(keccak256(abi.encodePacked(conditionId, "NO")));
+
+        // Mint tokens with scaled amounts
+        // Mint tokens with scaled amounts
+        _mint(msg.sender, yesTokenId, scaledLiquidity, "");
+        _mint(msg.sender, noTokenId, scaledLiquidity, "");
+
+        emit PnpTwitterMarketCreated(conditionId, msg.sender);
+        return conditionId;
+
+    }
+
+    function settleTwitterMarket(bytes32 conditionId, uint256 _winningTokenId) public onlyOwner returns  ( bool ) {
+        require(!marketSettled[conditionId], "Market already settled brother");  
+        require(isTwitterMarket[conditionId], "Invalid Twitter Market ConditionId");
+        winningTokenId[conditionId] = _winningTokenId;
+        marketSettled[conditionId] = true;
+        emit MarketSettled(conditionId, _winningTokenId, msg.sender);
+        return true;
+    }
+
 }
 
 // @TODO : Add comprehensive validation for all market parameters

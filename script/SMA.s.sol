@@ -7,6 +7,7 @@ import {IFactory} from "../src/interfaces/IFactory.sol";
 import {PriceModule} from "../src/PriceModule.sol";
 import {Test, console2, Vm} from "../lib/forge-std/src/Test.sol";
 
+
 contract SMAScript is Script {
     function setUp() public {}
 

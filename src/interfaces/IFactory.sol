@@ -11,6 +11,7 @@ interface IFactory {
     event DecisionTokenBurned(bytes32 indexed conditionId, uint256 tokenId, address indexed burner, uint256 amount);
     event PositionRedeemed(address indexed user, bytes32 indexed conditionId, uint256 amount);
     event MarketSettled(bytes32 indexed conditionId, uint256 winningTokenId, address indexed user);
+    event PnpInitSettlementTwitterMarkets(bytes32 indexed conditionId);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -30,6 +31,14 @@ interface IFactory {
         uint8 _moduleId,
         address _collateralToken,
         uint256[] memory _marketParams
+    ) external returns (bytes32);
+
+    function createTwitterMarket(
+        string memory _question, 
+        string memory settlerId, 
+        uint256 endTime, 
+        address _collateralToken, 
+        uint256 _initialLiquidity
     ) external returns (bytes32);
 
     function mintDecisionTokens(
@@ -69,4 +78,10 @@ interface IFactory {
     function winningTokenId(bytes32 conditionId) external view returns (uint256);
     function tokenInQuestion(bytes32 conditionId) external view returns (address);
     function TAKE_FEE() external view returns (uint256);
+
+    // Additional Twitter Market view functions
+    function isTwitterMarket(bytes32 conditionId) external view returns (bool);
+    function twitterEndTime(bytes32 conditionId) external view returns (uint256);
+    function twitterSettlerId(bytes32 conditionId) external view returns (string memory);
+    function twitterQuestion(bytes32 conditionId) external view returns (string memory);
 }

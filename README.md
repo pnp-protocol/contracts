@@ -1,13 +1,68 @@
 ----- Design of pnp smart contracts -----
 
-=== Deployment Summary of Price Markets ===
-  PNPFactory: 0xd40B3EbcA13E63e72D03d07C2e6a84D00aA035C2
-  PriceModule: 0xbB19494C2454E205DBF24Ce441127e5C38e5FD5A
+### Contract Addresses
+- **PNPFactory**: `0xd40B3EbcA13E63e72D03d07C2e6a84D00aA035C2`
+- **PriceModule**: `0xbB19494C2454E205DBF24Ce441127e5C38e5FD5A`
+- **PNPFactory with Twitter Markets**: `0x458E5BBCc764A2B38C5549bAC9cb420607496B73`
 
+   `0xF382De3CeFE887B3FDEAa2500Cd6826d3F32997a`
 
+Contract Addresses
+- Testnet Sepolia Base :
+- PNPFactory : 0x28c876BF878C3549adddAE5659Ff59B95Cb2C77f
+- PriceModule : 0x77dE2966e1e5dD240ef3317B8d88d8945a4e9Bd6
 
+MAINNET BASE
 
-- stick a diagram of modular design here and link to how it works docs
+== Logs ==
+  Deployer address: 0xC77B2Df43185C527325f6886C3c01281Fc4dCC53
+  PNPFactory deployed at: 0xD70E46d039bcD87e5bFce37C38727D7020C1998D
+  PriceModule deployed at: 0x5009dc0930e2643425507CeD051099028D9cfa09
+  
+=== Deployment Summary ===
+  PNPFactory with twitter markets: 0xD70E46d039bcD87e5bFce37C38727D7020C1998D
+  ========================
+
+### Events
+
+#### PnpMarketCreated
+- **Signature**: `PnpMarketCreated(bytes32 indexed conditionId, address indexed marketCreator)`
+- **Description**: Emitted when a new prediction market is created.
+- **Indexed Parameters**: `conditionId`, `marketCreator`
+
+#### DecisionTokensMinted
+- **Signature**: `DecisionTokensMinted(bytes32 indexed conditionId, uint256 tokenId, address indexed minter, uint256 amount)`
+- **Description**: Emitted when decision tokens are minted.
+- **Indexed Parameters**: `conditionId`, `tokenId`, `minter`
+
+#### DecisionTokenBurned
+- **Signature**: `DecisionTokenBurned(bytes32 indexed conditionId, uint256 tokenId, address indexed burner, uint256 amount)`
+- **Description**: Emitted when decision tokens are burned.
+- **Indexed Parameters**: `conditionId`, `tokenId`, `burner`
+
+#### PositionRedeemed
+- **Signature**: `PositionRedeemed(address indexed user, bytes32 indexed conditionId, uint256 amount)`
+- **Description**: Emitted when a user redeems their position.
+- **Indexed Parameters**: `user`, `conditionId`
+
+#### MarketSettled
+- **Signature**: `MarketSettled(bytes32 indexed conditionId, uint256 winningTokenId, address indexed user)`
+- **Description**: Emitted when a market is settled.
+- **Indexed Parameters**: `conditionId`, `user`
+
+#### PnpInitSettlementTwitterMarkets
+- **Signature**: `PnpInitSettlementTwitterMarkets(bytes32 indexed conditionId)`
+- **Description**: Emitted when initializing settlement for Twitter markets.
+- **Indexed Parameter**: `conditionId`
+
+#### PnpTwitterMarketCreated
+- **Signature**: `PnpTwitterMarketCreated(bytes32 indexed conditionId, address indexed marketCreator)`
+- **Description**: Emitted when a Twitter-specific prediction market is created.
+- **Indexed Parameters**: `conditionId`, `marketCreator`
+
+### Overview
+This document provides a comprehensive overview of the deployed smart contracts and their associated events. Each event is crucial for tracking the state changes and interactions within the contracts, providing transparency and auditability for users and developers alike.
+
 ### PNP-Factory.sol
 #### erc1155 part
 This contract inherits ERC1155 token standard from openzeppelin with vanilla implementation.

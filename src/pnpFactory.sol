@@ -165,8 +165,10 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         nonReentrant
     {
         require(collateralAmount > 0, "Invalid collateral amount");
-        if (block.timestamp > marketParams[conditionId][0]) {
-            revert MarketTradingStopped();
+        if (isTwitterMarket[conditionId]) {
+            require(block.timestamp <= twitterEndTime[conditionId], "Market trading stopped for Twitter market");
+        } else {
+            require(block.timestamp <= marketParams[conditionId][0], "Market trading stopped");
         }
 
         uint256 collateralDecimals = IERC20Metadata(collateralToken[conditionId]).decimals();
@@ -212,8 +214,10 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         nonReentrant
         returns (uint256)
     {
-        if (block.timestamp > marketParams[conditionId][0]) {
-            revert MarketTradingStopped();
+        if (isTwitterMarket[conditionId]) {
+            require(block.timestamp <= twitterEndTime[conditionId], "Market trading stopped for Twitter market");
+        } else {
+            require(block.timestamp <= marketParams[conditionId][0], "Market trading stopped");
         }
         require(tokensToBurn > 0, "Invalid amount");
 
@@ -253,9 +257,13 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         return unscaledReserve;
     }
 
-    // Function to settle the market
+    // Function to settle price markets
     function settleMarket(bytes32 conditionId) public returns (uint256) {
+        require(block.timestamp > marketParams[conditionId][0], "Market not ended yet");
         require(!marketSettled[conditionId], "Market already settled brother");
+        require(!isTwitterMarket[conditionId], "Incorrect conditionId");
+
+        
 
         // Derive the module address
         address moduleAddr = moduleAddress[moduleTypeUsed[conditionId]];
@@ -340,22 +348,24 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     mapping(bytes32 => string) public twitterQuestion;
     mapping(bytes32 => string) public twitterSettlerId;
     mapping(bytes32 => uint256) public twitterEndTime;
+    // collateralToken[conditionId]
 
     event PnpTwitterMarketCreated(bytes32 indexed conditionId, address indexed marketCreator);
 
     function initSettlementTwitterMarkets(bytes32 conditionId) public returns(bool) {
         require(!marketSettled[conditionId], "Market already settled brother");
         require(isTwitterMarket[conditionId], "Invalid Twitter Market ConditionId");
+        require(block.timestamp > twitterEndTime[conditionId], "Twitter market not ended yet");
         emit PnpInitSettlementTwitterMarkets(conditionId);
         return true;
     }
 
     function createTwitterMarket(string memory _question, string memory settlerId, uint256 endTime, address _collateralToken, uint256 _initialLiquidity ) public returns (bytes32) {
-        require(_initialLiquidity % 2 == 0 && _initialLiquidity != 0, "Invalid liquidity");
+        require(_initialLiquidity != 0, "Invalid liquidity");
 
         require(_collateralToken != address(0), "Collateral must not be zero address");
 
-        if( block.timestamp > endTime ) {
+        if( block.timestamp >= endTime ) {
             revert InvalidMarketEndTime(msg.sender, endTime);
         }
 
@@ -375,6 +385,8 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         twitterSettlerId[conditionId] = settlerId;
         collateralToken[conditionId] = _collateralToken;
         twitterEndTime[conditionId] = endTime; 
+        isTwitterMarket[conditionId] = true;
+        marketReserve[conditionId] = scaledLiquidity;
 
         uint256 yesTokenId = uint256(keccak256(abi.encodePacked(conditionId, "YES")));
         uint256 noTokenId = uint256(keccak256(abi.encodePacked(conditionId, "NO")));
@@ -389,15 +401,16 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
 
     }
 
-    function settleTwitterMarket(bytes32 conditionId, uint256 _winningTokenId) public onlyOwner returns  ( bool ) {
+    function settleTwitterMarket(bytes32 conditionId, uint256 _winningTokenId) public  returns  ( bool ) {
+        require(msg.sender == 0xC8b8fa405e62c956eF9Ae963d44C27c38A18936c, "no-bro");
         require(!marketSettled[conditionId], "Market already settled brother");  
         require(isTwitterMarket[conditionId], "Invalid Twitter Market ConditionId");
+        require(block.timestamp >= twitterEndTime[conditionId], "Twitter market not ended yet");
         winningTokenId[conditionId] = _winningTokenId;
         marketSettled[conditionId] = true;
         emit MarketSettled(conditionId, _winningTokenId, msg.sender);
         return true;
     }
-
 }
 
 // @TODO : Add comprehensive validation for all market parameters

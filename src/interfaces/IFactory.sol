@@ -7,6 +7,7 @@ interface IFactory {
     //////////////////////////////////////////////////////////////*/
 
     event PnpMarketCreated(bytes32 indexed conditionId, address indexed marketCreator);
+    event PnpTwitterMarketCreated(bytes32 indexed conditionId, address indexed marketCreator);
     event DecisionTokensMinted(bytes32 indexed conditionId, uint256 tokenId, address indexed minter, uint256 amount);
     event DecisionTokenBurned(bytes32 indexed conditionId, uint256 tokenId, address indexed burner, uint256 amount);
     event PositionRedeemed(address indexed user, bytes32 indexed conditionId, uint256 amount);

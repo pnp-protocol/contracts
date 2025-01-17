@@ -85,4 +85,10 @@ interface IFactory {
     function twitterEndTime(bytes32 conditionId) external view returns (uint256);
     function twitterSettlerId(bytes32 conditionId) external view returns (string memory);
     function twitterQuestion(bytes32 conditionId) external view returns (string memory);
+
+    // Additional helper functions
+    function getYesTokenId(bytes32 conditionId) external pure returns (uint256);
+    function getNoTokenId(bytes32 conditionId) external pure returns (uint256);
+    function initSettlementTwitterMarkets(bytes32 conditionId) external returns (bool);
+    function settleTwitterMarket(bytes32 conditionId, uint256 _winningTokenId) external returns (bool);
 }

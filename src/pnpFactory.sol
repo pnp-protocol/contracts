@@ -263,8 +263,6 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         require(!marketSettled[conditionId], "Market already settled brother");
         require(!isTwitterMarket[conditionId], "Incorrect conditionId");
 
-        
-
         // Derive the module address
         address moduleAddr = moduleAddress[moduleTypeUsed[conditionId]];
 

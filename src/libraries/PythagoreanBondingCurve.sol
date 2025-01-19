@@ -20,6 +20,7 @@ library PythagoreanBondingCurve {
     // r : total reserve in collateral against that market
     // s(yes) : supplies of conditionId YES
     // s(no) : supplies of conditionId NO
+    // l(yes) : liquidity to be added in collateral against that market
 
     /// @dev Returns additional number of tokens to mint of token A (a)
     function getTokensToMint(uint256 r, uint256 a, uint256 b, uint256 l) public pure returns (uint256 tokenToMint) {

@@ -1,27 +1,24 @@
 ----- Design of pnp smart contracts -----
 
-### Contract Addresses
-- **PNPFactory**: `0xd40B3EbcA13E63e72D03d07C2e6a84D00aA035C2`
-- **PriceModule**: `0xbB19494C2454E205DBF24Ce441127e5C38e5FD5A`
-- **PNPFactory with Twitter Markets**: `0x458E5BBCc764A2B38C5549bAC9cb420607496B73`
+v2 uses zkFetch module to fetch coingecko price and settle markets onchain.
 
-   `0xF382De3CeFE887B3FDEAa2500Cd6826d3F32997a`
+functions in price markets 
+- createPredictionMarket 
+Parameters :
+1) chainId where the token is deployed [base, solana, avalanche, arbitrum]
+2) address of the token 
+3) current price
+4) target price
+5) collateral token [ USDC mostly ]
+6) endTime 
 
-Contract Addresses
-- Testnet Sepolia Base :
-- PNPFactory : 0x28c876BF878C3549adddAE5659Ff59B95Cb2C77f
-- PriceModule : 0x77dE2966e1e5dD240ef3317B8d88d8945a4e9Bd6
+- mindDecisionTokens
+Parameters :
+1) conditionId bytes32 representing the market
+2) tokenId of the token to be minted 
+3) amount worth of collateral to be minted decision tokens of
 
-MAINNET BASE
-
-== Logs ==
-  Deployer address: 0xC77B2Df43185C527325f6886C3c01281Fc4dCC53
-  PNPFactory deployed at: 0xD70E46d039bcD87e5bFce37C38727D7020C1998D
-  PriceModule deployed at: 0x5009dc0930e2643425507CeD051099028D9cfa09
-  
-=== Deployment Summary ===
-  PNPFactory with twitter markets: 0xD70E46d039bcD87e5bFce37C38727D7020C1998D
-  ========================
+- 
 
 ### Events
 

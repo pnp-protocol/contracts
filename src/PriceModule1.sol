@@ -19,9 +19,12 @@ pragma solidity ^0.8.20;
 import {ITruthModule} from "./interfaces/ITruthModule.sol";
 import {IUniswapV3Pool} from "lib/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
-// for Uniswap V3 Pools
-// For market questions like:
-// Will token [X] reach [Y] by the end of [Z]?
+// for Uniswap V3 WETH and ETH Denominated Pools
+// Price Module == 1
+// Settle function accepts USDenominated target price
+// We fetch the Weth price from NANI's ctc using the tokenA-WETH pool address
+// Then we get WETH's price in terms of USDC 
+// then bamm compare
 
 interface INANIPriceChecker {
     function checkPrice(address token) external returns (uint256, string memory);

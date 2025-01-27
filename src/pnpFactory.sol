@@ -107,7 +107,9 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     /// @dev moduleId 0 for token volatality settlement
     /// @dev need to approve this contract of _collateral
 
-    // _collateral is USDT/USDC for now
+    // _collateralToken in most of the cases is USDT/USDC 
+    // _targetPrice accepted will be USD denominated
+    // PriceModule 1 for all WETH Pools
     function createPredictionMarket(
         uint256 _initialLiquidity,
         address _tokenInQuestion,

@@ -9,17 +9,18 @@ pragma solidity ^0.8.20;
 // ╚═╝░░░░░╚═╝░░╚══╝╚═╝░░░░░  ╚═╝░░░░░╚═╝░░╚═╝░╚════╝░░░░╚═╝░░░░╚════╝░░╚════╝░░╚════╝░╚══════╝
 
 
-// ███╗░░░███╗░█████╗░██████╗░██╗░░░██╗██╗░░░░░███████╗░░░░░░░█████╗░
-// ████╗░████║██╔══██╗██╔══██╗██║░░░██║██║░░░░░██╔════╝░░░░░░██╔══██╗
-// ██╔████╔██║██║░░██║██║░░██║██║░░░██║██║░░░░░█████╗░░█████╗██║░░██║
-// ██║╚██╔╝██║██║░░██║██║░░██║██║░░░██║██║░░░░░██╔══╝░░╚════╝██║░░██║
-// ██║░╚═╝░██║╚█████╔╝██████╔╝╚██████╔╝███████╗███████╗░░░░░░╚█████╔╝
-// ╚═╝░░░░░╚═╝░╚════╝░╚═════╝░░╚═════╝░╚══════╝╚══════╝░░░░░░░╚════╝░
+
+// ███╗░░░███╗░█████╗░██████╗░██╗░░░██╗██╗░░░░░███████╗░░░░░░░░███╗░░
+// ████╗░████║██╔══██╗██╔══██╗██║░░░██║██║░░░░░██╔════╝░░░░░░░████║░░
+// ██╔████╔██║██║░░██║██║░░██║██║░░░██║██║░░░░░█████╗░░█████╗██╔██║░░
+// ██║╚██╔╝██║██║░░██║██║░░██║██║░░░██║██║░░░░░██╔══╝░░╚════╝╚═╝██║░░
+// ██║░╚═╝░██║╚█████╔╝██████╔╝╚██████╔╝███████╗███████╗░░░░░░███████╗
+// ╚═╝░░░░░╚═╝░╚════╝░╚═════╝░░╚═════╝░╚══════╝╚══════╝░░░░░░╚══════╝
 
 import {ITruthModule} from "./interfaces/ITruthModule.sol";
 import {IUniswapV3Pool} from "lib/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
-// for Uniswap V3 WETH and ETH Denominated Pools
+// for Uniswap V3 WETH Denominated Pools
 // Price Module == 1
 // Settle function accepts USDenominated target price
 // We fetch the Weth price from NANI's ctc using the tokenA-WETH pool address
@@ -28,6 +29,7 @@ import {IUniswapV3Pool} from "lib/v3-core/contracts/interfaces/IUniswapV3Pool.so
 
 interface INANIPriceChecker {
     function checkPrice(address token) external returns (uint256, string memory);
+    function checkPriceInETHToUSDC(address token) external view returns (uint256 price, string memory priceStr);
 }
 
 contract PriceModule is ITruthModule {
@@ -36,7 +38,7 @@ contract PriceModule is ITruthModule {
     // gives price of `token` in USDC through NANI'S ctc
 
     function getPriceInUSDC(address token) public returns (uint256 price) {
-        (price,) = INANIPriceChecker(NANI_PriceChecker).checkPrice(token);
+        (price,) = INANIPriceChecker(NANI_PriceChecker).checkPriceInETHToUSDC(token);
     }
 
     // Function to settle the market

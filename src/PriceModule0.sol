@@ -24,6 +24,7 @@ import {IUniswapV3Pool} from "lib/v3-core/contracts/interfaces/IUniswapV3Pool.so
 
 interface INANIPriceChecker {
     function checkPrice(address token) external returns (uint256, string memory);
+    function checkPriceInETHToUSDC(address token) external view returns (uint256 price, string memory priceStr);
 }
 
 contract PriceModule is ITruthModule {
@@ -36,6 +37,7 @@ contract PriceModule is ITruthModule {
     }
 
     // Function to settle the market
+    // targetPrice is in 
     function settle(bytes32 conditionId, address token, uint256 targetPrice) external override returns (uint256) {
         // Get current price from the pool
         uint256 currentPrice = getPriceInUSDC(token);

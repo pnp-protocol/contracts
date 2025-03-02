@@ -88,6 +88,8 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
     constructor(string memory uri) ERC1155(uri) Ownable(msg.sender) {}
 
+
+
     /*//////////////////////////////////////////////////////////////
                                PUBLIC FUNCTIONS
                              - createPredictionMarket
@@ -96,6 +98,8 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
                              - settleMarket
                              - redeemPosition
     //////////////////////////////////////////////////////////////*/
+
+
 
     // @TODO : Change marketParams to a struct later as per needs
     /// @param _marketParams[0] : Market end timestamp
@@ -106,6 +110,10 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     /// @param _moduleId : id of the truth module
     /// @dev moduleId 0 for token volatality settlement
     /// @dev need to approve this contract of _collateral
+
+    /*//////////////////////////////////////////////////////////////
+                               PRICE MARKETS
+    //////////////////////////////////////////////////////////////*/
 
     // _collateral is USDT/USDC for now
     function createPredictionMarket(
@@ -152,13 +160,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         return conditionId;
     }
 
-    function scaleTo18Decimals(uint256 amount, uint256 tokenDecimals) internal pure returns (uint256) {
-        return (amount * 10 ** 18) / 10 ** tokenDecimals;
-    }
-
-    function scaleFrom18Decimals(uint256 amount, uint256 tokenDecimals) internal pure returns (uint256) {
-        return (amount * 10 ** tokenDecimals) / 10 ** 18;
-    }
+    
 
     function mintDecisionTokens(bytes32 conditionId, uint256 collateralAmount, uint256 tokenIdToMint)
         public
@@ -303,42 +305,8 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     }
 
     /*//////////////////////////////////////////////////////////////
-                               ADMIN FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    // Function to set module addresses, restricted to the contract owner
-    function setModuleAddress(uint8 moduleType, address moduleAddr) external onlyOwner {
-        require(moduleAddr != address(0), "Invalid address");
-        require(moduleAddress[moduleType] == address(0), "Module already set");
-        moduleAddress[moduleType] = moduleAddr;
-    }
-
-    function setTakeFee(uint256 _takeFee) external onlyOwner {
-        TAKE_FEE = _takeFee;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                               PUBLIC GETTERS
-    //////////////////////////////////////////////////////////////*/
-
-    function getMarketEndTime(bytes32 conditionId) public view returns (uint256) {
-        return marketParams[conditionId][0];
-    }
-
-    function getMarketTargetPrice(bytes32 conditionId) public view returns (uint256) {
-        return marketParams[conditionId][1];
-    }
-
-    function getYesTokenId(bytes32 conditionId) public pure returns (uint256) {
-        return uint256(keccak256(abi.encodePacked(conditionId, "YES")));
-    }
-
-    function getNoTokenId(bytes32 conditionId) public pure returns (uint256) {
-        return uint256(keccak256(abi.encodePacked(conditionId, "NO")));
-    }
-
-    /*//////////////////////////////////////////////////////////////
                                TWITTER MARKETS
+                            // under construction //
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Checks whether given conditionId is related to twitter markets or not
@@ -346,10 +314,10 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     mapping(bytes32 => string) public twitterQuestion;
     mapping(bytes32 => string) public twitterSettlerId;
     mapping(bytes32 => uint256) public twitterEndTime;
-    // collateralToken[conditionId]
 
     event PnpTwitterMarketCreated(bytes32 indexed conditionId, address indexed marketCreator);
 
+    // after market deadline, offchain actor need to call 
     function initSettlementTwitterMarkets(bytes32 conditionId) public returns(bool) {
         require(!marketSettled[conditionId], "Market already settled brother");
         require(isTwitterMarket[conditionId], "Invalid Twitter Market ConditionId");
@@ -408,6 +376,68 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         marketSettled[conditionId] = true;
         emit MarketSettled(conditionId, _winningTokenId, msg.sender);
         return true;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                               PERPLEXITY MARKETS
+                            
+    //////////////////////////////////////////////////////////////*/
+
+    event PNP_PPLXMarketCreated(bytes32 indexed conditionId, address indexed marketCreator);
+    function createPPLXMarket(string memory _question, uint256 _endTime, address _collateralToken, uint256 _initialLiquidity ) public returns (bytes32) {
+        require(_initialLiquidity != 0, "Invalid liquidity");
+
+        require(_collateralToken != address(0), "Collateral must not be zero address");
+
+        if( block.timestamp >= _endTime ) {
+            revert InvalidMarketEndTime(msg.sender, _endTime);
+        }
+
+        // set up the required mappings
+        // emit the conditionId 
+        // mint YES/NO tokens 
+        // transfer the liquidity to the factory
+        bytes32 conditionId = keccak256(abi.encodePacked(_question, msg.sender, block.timestamp));
+        emit PNP_PPLXMarketCreated(conditionId, msg.sender);
+        
+    }
+
+
+
+
+
+    /*//////////////////////////////////////////////////////////////
+                        PUBLIC GETTERS AND HELPERS
+    - getMarketEndTime
+    - getMarketTargetPrice
+    - getYesTokenId
+    - getNoTokenId
+    - scaleTo18Decimals
+    - scaleFrom18Decimals
+    //////////////////////////////////////////////////////////////*/
+
+    function getMarketEndTime(bytes32 conditionId) public view returns (uint256) {
+        return marketParams[conditionId][0];
+    }
+
+    function getMarketTargetPrice(bytes32 conditionId) public view returns (uint256) {
+        return marketParams[conditionId][1];
+    }
+
+    function getYesTokenId(bytes32 conditionId) public pure returns (uint256) {
+        return uint256(keccak256(abi.encodePacked(conditionId, "YES")));
+    }
+
+    function getNoTokenId(bytes32 conditionId) public pure returns (uint256) {
+        return uint256(keccak256(abi.encodePacked(conditionId, "NO")));
+    }
+
+    function scaleTo18Decimals(uint256 amount, uint256 tokenDecimals) internal pure returns (uint256) {
+        return (amount * 10 ** 18) / 10 ** tokenDecimals;
+    }
+
+    function scaleFrom18Decimals(uint256 amount, uint256 tokenDecimals) internal pure returns (uint256) {
+        return (amount * 10 ** tokenDecimals) / 10 ** 18;
     }
 }
 

@@ -239,7 +239,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
 
     // Function to settle price markets
     // called by script only
-    function settleMarket(bytes32 conditionId, uint256 _winningTokenId) public returns (uint256) {
+    function settleMarket(bytes32 conditionId, uint256 _winningTokenId) external onlyOwner() returns (uint256) {
         require(block.timestamp > marketEndTime[conditionId], "Market ain't finished yet");
         require(!marketSettled[conditionId], "Market already settled brother");
 

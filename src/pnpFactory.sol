@@ -122,7 +122,12 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         IERC20Metadata(_collateralToken).transferFrom(msg.sender, address(this), _initialLiquidity);
 
         bytes32 conditionId = keccak256(abi.encodePacked(_question, _endTime));
-        require(!isMarketCreated[conditionId], "Market already created");
+        if(isMarketCreated[conditionId]){
+            revert() ;
+        }
+        else{
+            isMarketCreated[conditionId] = true;
+        }
 
         // Store market parameters with scaled liquidity
         marketQuestion[conditionId] = _question;

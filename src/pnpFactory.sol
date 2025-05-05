@@ -271,6 +271,9 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         uint256 collateralDecimals = IERC20Metadata(collateralToken[conditionId]).decimals();
         uint256 reserveToRedeem = scaleFrom18Decimals(scaledReserveToRedeem, collateralDecimals);
 
+        // Update market reserve *before* transfer (Checks-Effects-Interactions pattern)
+        marketReserve[conditionId] = marketReserve[conditionId] - scaledReserveToRedeem;
+
         IERC20(collateralToken[conditionId]).transfer(msg.sender, reserveToRedeem);
 
         emit PNP_PositionRedeemed(msg.sender, conditionId, reserveToRedeem);

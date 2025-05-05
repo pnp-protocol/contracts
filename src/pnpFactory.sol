@@ -274,6 +274,9 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         IERC20(collateralToken[conditionId]).transfer(msg.sender, reserveToRedeem);
 
         emit PNP_PositionRedeemed(msg.sender, conditionId, reserveToRedeem);
+
+        _burn(msg.sender, winningTokenId[conditionId], userBalance);
+
         return reserveToRedeem;
     }
 

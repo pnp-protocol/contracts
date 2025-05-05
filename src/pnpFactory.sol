@@ -61,6 +61,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     event PNP_DecisionTokenBurned(bytes32 indexed conditionId, uint256 tokenId, address indexed burner, uint256 amount);
     event PNP_PositionRedeemed(address indexed user, bytes32 indexed conditionId, uint256 amount);
     event PNP_MarketSettled(bytes32 indexed conditionId, uint256 winningTokenId, address indexed user);
+    event PNP_TakeFeeUpdated(uint256 newTakeFee);
 
 
     /*//////////////////////////////////////////////////////////////
@@ -102,7 +103,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         uint256 _endTime
     ) external nonReentrant returns (bytes32) {
         // need to split IL to outcome1 outcome2 YES NO for now
-        require(_initialLiquidity % 2 == 0 && _initialLiquidity != 0, "Invalid liquidity");
+        require(_initialLiquidity > 0, "Invalid liquidity wtf");
 
         // fuck u address 0 useless bitch
         require(_collateralToken != address(0), "Collateral must not be zero address");
@@ -254,7 +255,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
 
     
     // Function to redeem position
-    function redeemPosition(bytes32 conditionId) public returns (uint256) {
+    function redeemPosition(bytes32 conditionId) public nonReentrant returns (uint256) {
         require(marketSettled[conditionId], "Market not settled");
 
         uint256 userBalance = balanceOf(msg.sender, winningTokenId[conditionId]);
@@ -281,7 +282,9 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
 
     function setTakeFee(uint256 _takeFee) external onlyOwner {
+        require(_takeFee >= 0 && _takeFee <= 2000, "Invalid take fee");
         TAKE_FEE = _takeFee;
+        emit PNP_TakeFeeUpdated(_takeFee);
     }
 
     /*//////////////////////////////////////////////////////////////

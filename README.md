@@ -1,145 +1,110 @@
+# PNPFactory Prediction Market Design Overview
 
+## Introduction
 
-----------------------------------------------
-- [ ] verify bonding curve init point
-- [ ] do a precision loss analysis
-- [ ] optimise gas sqrt
+These set of smart contracts allows users to create, participate in, and settle binary prediction markets based on real-world events. 
+It leverages a unique Pythagorean Bonding Curve mechanism for automated market making and uses ERC-1155 tokens to represent outcome shares (YES/NO tokens).
 
+## Core Concepts
 
-#### PnpMarketCreated
-- **Signature**: `PnpMarketCreated(bytes32 indexed conditionId, address indexed marketCreator)`
-- **Description**: Emitted when a new prediction market is created.
-- **Indexed Parameters**: `conditionId`, `marketCreator`
+1.  **Market Creation**: Anyone can create a new prediction market by providing an initial liquidity amount in a specified ERC20 collateral token (like USDC or USDT), defining the market question, and setting an end time. The initial liquidity provider receives the first set of YES and NO outcome tokens.
+2.  **Collateral & Scaling**: The system uses a designated ERC20 token as collateral. All internal calculations involving reserves and token supplies are scaled to 18 decimals to ensure consistent precision, regardless of the collateral token's decimals. Helper functions (`scaleTo18Decimals`, `scaleFrom18Decimals`) manage this conversion.
+3.  **Outcome Tokens (ERC-1155)**: Each market has two corresponding outcome tokens (YES and NO) implemented as ERC-1155 tokens. The `tokenId` for each is deterministically generated based on the market's unique `conditionId` and the outcome ("YES" or "NO").
+4.  **Pythagorean Bonding Curve**: The heart of the market maker. It dynamically calculates the number of outcome tokens to mint when collateral is added, or the amount of collateral to return when outcome tokens are burned. The curve maintains a relationship between the total collateral reserve (R) and the supplies of YES (a) and NO (b) tokens, implicitly following \( R = c \sqrt{a^2 + b^2} \), where *c* is a constant derived from initial conditions. This ensures liquidity and determines prices based on supply and demand.
+5.  **Minting & Burning**: Users can buy (mint) specific outcome tokens by providing collateral or sell (burn) their outcome tokens to receive collateral back. The `PythagoreanBondingCurve` library calculates the exact amounts for these operations. A small `TAKE_FEE` is applied during minting, contributing to the market's reserve pool, which ultimately benefits the holders of the winning outcome token.
+6.  **Market Settlement**: Once the market's end time is reached, an authorized owner settles the market by specifying the winning outcome token's ID.
+7.  **Redeeming Winnings**: Holders of the winning outcome token can redeem their tokens after settlement. They receive a proportional share of the final market reserve (including collected fees) based on their holdings of the winning token.
 
-#### DecisionTokensMinted
-- **Signature**: `DecisionTokensMinted(bytes32 indexed conditionId, uint256 tokenId, address indexed minter, uint256 amount)`
-- **Description**: Emitted when decision tokens are minted.
-- **Indexed Parameters**: `conditionId`, `tokenId`, `minter`
+## `PNPFactory.sol` Key Functions
 
-#### DecisionTokenBurned
-- **Signature**: `DecisionTokenBurned(bytes32 indexed conditionId, uint256 tokenId, address indexed burner, uint256 amount)`
-- **Description**: Emitted when decision tokens are burned.
-- **Indexed Parameters**: `conditionId`, `tokenId`, `burner`
+This contract manages the lifecycle of prediction markets.
 
-#### PositionRedeemed
-- **Signature**: `PositionRedeemed(address indexed user, bytes32 indexed conditionId, uint256 amount)`
-- **Description**: Emitted when a user redeems their position.
-- **Indexed Parameters**: `user`, `conditionId`
+```solidity
+/// @notice Creates a new binary prediction market.
+/// @param _initialLiquidity Initial collateral provided by the creator.
+/// @param _collateralToken The ERC20 token used as collateral.
+/// @param _question The text of the prediction market question.
+/// @param _endTime The timestamp when market trading ends and settlement can occur.
+/// @return conditionId A unique identifier for the created market.
+function createPredictionMarket(
+    uint256 _initialLiquidity,
+    address _collateralToken,
+    string memory _question,
+    uint256 _endTime
+) external nonReentrant returns (bytes32);
 
-#### MarketSettled
-- **Signature**: `MarketSettled(bytes32 indexed conditionId, uint256 winningTokenId, address indexed user)`
-- **Description**: Emitted when a market is settled.
-- **Indexed Parameters**: `conditionId`, `user`
+/// @notice Mints a specific outcome token (YES or NO) in exchange for collateral.
+/// @param conditionId The unique identifier of the market.
+/// @param collateralAmount The amount of collateral provided by the minter.
+/// @param tokenIdToMint The ID of the outcome token (YES or NO) to mint.
+function mintDecisionTokens(
+    bytes32 conditionId,
+    uint256 collateralAmount,
+    uint256 tokenIdToMint
+) public nonReentrant;
 
-#### PnpInitSettlementTwitterMarkets
-- **Signature**: `PnpInitSettlementTwitterMarkets(bytes32 indexed conditionId)`
-- **Description**: Emitted when initializing settlement for Twitter markets.
-- **Indexed Parameter**: `conditionId`
+/// @notice Burns a specific outcome token (YES or NO) to receive collateral back.
+/// @param conditionId The unique identifier of the market.
+/// @param tokenIdToBurn The ID of the outcome token (YES or NO) to burn.
+/// @param tokensToBurn The amount of the outcome token to burn.
+/// @return The amount of collateral returned to the user.
+function burnDecisionTokens(
+    bytes32 conditionId,
+    uint256 tokenIdToBurn,
+    uint256 tokensToBurn
+) public nonReentrant returns (uint256);
 
-#### PnpTwitterMarketCreated
-- **Signature**: `PnpTwitterMarketCreated(bytes32 indexed conditionId, address indexed marketCreator)`
-- **Description**: Emitted when a Twitter-specific prediction market is created.
-- **Indexed Parameters**: `conditionId`, `marketCreator`
+/// @notice Settles a market after its end time (Owner restricted).
+/// @param conditionId The unique identifier of the market to settle.
+/// @param _winningTokenId The ID of the outcome token determined to be the winner.
+/// @return The winning token ID.
+function settleMarket(
+    bytes32 conditionId,
+    uint256 _winningTokenId
+) external onlyOwner returns (uint256);
 
-### Overview
-This document provides a comprehensive overview of the deployed smart contracts and their associated events. Each event is crucial for tracking the state changes and interactions within the contracts, providing transparency and auditability for users and developers alike.
+/// @notice Allows users to redeem their holdings of the winning token for collateral after settlement.
+/// @param conditionId The unique identifier of the settled market.
+/// @return The amount of collateral redeemed by the user.
+function redeemPosition(
+    bytes32 conditionId
+) public nonReentrant returns (uint256);
 
-### PNP-Factory.sol
-#### erc1155 part
-This contract inherits ERC1155 token standard from openzeppelin with vanilla implementation.
-We write the burn function according to our market logic allowing people
-to burn their holdings for the collateral.
+/// @notice Updates the fee charged on minting operations (Owner restricted).
+/// @param _takeFee The new fee in basis points (e.g., 100 = 1%).
+function setTakeFee(uint256 _takeFee) external onlyOwner;
+```
 
-#### registry part
-This contracts acts as a registry for all the truth modules contracts in existence.
-A function to add a new truth module is provided to the factory contract and is `onlyOwner` protected.
-Anyone can request to add a new truth module contract by submitting the contract following the ITruthModule.sol interface in our discord and we will add it to the registry after security review.
-`addNewTruthModule(address _truthModule) returns(uint8 moduleId);`
+## `PNPFactory.sol` Key Events
 
-#### PredictionMarketCreation part
-This contract is used to create prediction market for any given token in 
-question and is public therefore market creation is permissionless.
-The market creator has to provide some initial liquidity for the market in
-any ERC20 collateral. We prefer using USDT/USDC as collateral but it is to one's wish.
-`Will price of $HTUAH go below $0.0000006? Yes/No`
-Market creator can infact create a market with $HTUAH as collateral.
-chaos
-it's just a permissionless tool to express sentiments backed with value.
-`createPredictionMarket(uint256 _initialLiquidity, address _tokenInQuestion, uint8 _moduleId, uint256[] _marketParams) returns (bytes32 conditionId);
-important to note that the first param of _marketParams of all markets should be the collateral token address and the second param should be the endTimestamp of the market.
+Events emitted by the contract to log significant actions.
 
-this function does the following things : 
-- we check that _initialLiquidity is a multiple of 2 and != 0.
-- no check for _moduleId because we have a few rn.
-- we check that _marketParams[0] is != address(0) and _marketParams[1] is > now.
+```solidity
+/// @notice Emitted when a new market is successfully created.
+event PNP_MarketCreated(bytes32 indexed conditionId, address indexed marketCreator);
 
-- creates a bytes32 conditionId from tokenInQuestion, moduleId and msg.sender. we also emit this at the end of the function through an event called `pnpMarketCreated`.
-- we initialize several mappings with the conditionId as key like 
-`mapping(bytes32 => uint8) public moduleTypeUsed;` , 
-- think of a mech to create two new ERC1155 tokenIds for the market representing YES and NO tokens. we also need to emit an event emiting both the tokenIds.
-- we transfer the _initialLiquidity to the market contract and update some variable to account that half tokens are staked at YES and half are staked at NO. this variables are updated whenever someone mints YES or NO.
-- we store bytes32=> uint256[] marketParams 
+/// @notice Emitted when outcome tokens are minted.
+event PNP_DecisionTokensMinted(bytes32 indexed conditionId, uint256 tokenId, address indexed minter, uint256 amount);
 
-#### Minting and Burning YES and NO tokens part
-We define two functions to mint and burn YES and NO tokens.
-`mintDecisionTokens(bytes32 conditionId,
-uint256 collateralAmount,
-uint256 tokenIdToMint
-)`
-`burnDecisionTokens(bytes32 conditionId,
-uint256 tokenIdToBurn)`
+/// @notice Emitted when outcome tokens are burned.
+event PNP_DecisionTokenBurned(bytes32 indexed conditionId, uint256 tokenId, address indexed burner, uint256 amount);
 
-we check the following things in `mintDecisionTokens()` :
-- the market is not expired from the marketParams mapping.
-- check that the tokenIdToMint corresponds to the conditionId. (think how to do this)
-- we get the number of tokens to mint from a library function which accepts some finentich state variables about the market like value staked against YES and NO tokens and the total reserve against the market and the constant c which is calculated by another function from the library.
-- we then mint the ERC1155 corresponding tokens and then emit the event `marketDecisionMinted` with `(bytes32 conditionId, uint256 tokenId, address minter, uint256 amount)`.
+/// @notice Emitted when a user successfully redeems winning tokens.
+event PNP_PositionRedeemed(address indexed user, bytes32 indexed conditionId, uint256 amount);
 
-`burnDecisionTokens(bytes32 conditionId,
-uint256 tokenIdToBurn)`
-- we check that the market is not expired from the marketParams mapping.
-- code the burn mechanism in the library.
+/// @notice Emitted when a market is settled by the owner.
+event PNP_MarketSettled(bytes32 indexed conditionId, uint256 winningTokenId, address indexed user);
 
-#### Market Execution part
-- when a market is created and the marketCreator is minted equal YES and NO tokens according to the initial liquidity,
-the market is open for anyone to buy/sell YES and NO tokens on the bonding curve.
-- We are using the Pythagorean Bonding Curve for each market. So create a mapping for conditionId to uint256[] 
-holding state variables for the market. So that we can fetch this and pass on to the bonding curve library contract to mint or burn appropriate amount of tokens.
-- If the market is settled (another state variable for this)
-settled and expired have different meanings. 
-- We have another function called `settleMarket` which can only be called by the corresponding truth module contract address.
-- When the market is settled and we get the correct truth from the Module, users can not call mint or burn decision tokens anymore. Holders of all tokens can only call
-`redeemDecisionTokens` function which rewards all the holders of the current correct ERC1155 tokenId provided by the module contract.
+/// @notice Emitted when the minting fee is updated by the owner.
+event PNP_TakeFeeUpdated(uint256 newTakeFee);
+```
 
+## `PythagoreanBondingCurve.sol` Library
 
-## Pythagorean Bonding Curve part
-This contract will have these functions only :
+This library provides the mathematical foundation for the automated market maker.
 
-`getTokensToMint()
-r : total reserve
-a : curr supply of token to mint
-b : curr supply of other token 
-l : reserve to be added  
-returns ( uint256 tokenToMint) 
+*   `getTokensToMint(r, a, b, l)`: Calculates how many tokens of outcome 'a' should be minted for providing 'l' amount of collateral, given current reserve 'r' and supplies 'a' and 'b'.
+*   `getReserveToRelease(r, a, b, tokensToBurn)`: Calculates how much collateral 'r' should be returned for burning 'tokensToBurn' amount of outcome 'a', given supplies 'a' and 'b'.
+*   `getPrice(r, a, b)`: Calculates the current instantaneous price of outcome token 'a' based on the reserve 'r' and supplies 'a' and 'b'.
 
-
-## Market Settlement part
-whoever calls settle() will be eligible for a certain portion X of the reserve.
-
-
- 
-- registry part
-- PredictionMarket Creation part 
-- Minting and Burning YES and NO tokens part
-- Market settlement part
-- redeeming the decision tokens
-- bonding curve part
-
-
-
-
-
-- test for minting yes tokens after market creation 
-- test for minting after ending market
-- test for settling market 
-- tesr for redeeming decision tokens
+This system provides a robust and decentralized platform for creating and participating in prediction markets.

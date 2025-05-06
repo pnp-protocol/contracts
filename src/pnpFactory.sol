@@ -20,12 +20,11 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {PythagoreanBondingCurve} from "./libraries/PythagoreanBondingCurve.sol";
 
 contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
-
     /// @dev market question
-    mapping ( bytes32 => string) public marketQuestion;
+    mapping(bytes32 => string) public marketQuestion;
 
     /// @dev end time for the market ( compared to block.timestamp )
-    mapping ( bytes32 => uint256) public marketEndTime;
+    mapping(bytes32 => uint256) public marketEndTime;
 
     /// @dev true if market exists
     mapping(bytes32 => bool) public isMarketCreated;
@@ -43,7 +42,6 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     /// @dev uint256(keccak256(abi.encodePacked(conditionId, "YES" | "NO" )));
     mapping(bytes32 => uint256) public winningTokenId;
 
-    
     /// @dev YES | NO tokens are scaled with 18 decimals
     uint256 constant DECISION_TOKEN_DECIMALS = 18;
 
@@ -57,12 +55,13 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
 
     event PNP_MarketCreated(bytes32 indexed conditionId, address indexed marketCreator);
-    event PNP_DecisionTokensMinted(bytes32 indexed conditionId, uint256 tokenId, address indexed minter, uint256 amount);
+    event PNP_DecisionTokensMinted(
+        bytes32 indexed conditionId, uint256 tokenId, address indexed minter, uint256 amount
+    );
     event PNP_DecisionTokenBurned(bytes32 indexed conditionId, uint256 tokenId, address indexed burner, uint256 amount);
     event PNP_PositionRedeemed(address indexed user, bytes32 indexed conditionId, uint256 amount);
     event PNP_MarketSettled(bytes32 indexed conditionId, uint256 winningTokenId, address indexed user);
     event PNP_TakeFeeUpdated(uint256 newTakeFee);
-
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -87,13 +86,13 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
 
     /// @param _initialLiquidity : initial liquidity in `_marketParams[0]` denomination
-    /// @param _collateralToken : collateral token used for market 
+    /// @param _collateralToken : collateral token used for market
     /// @dev need to approve this contract of _collateral
 
     // _collateral is USDT/USDC for now
     // perplexity markets only binary markets for now [ change bonding curve for multioutcomes support ]
     // other params
-    // string _question 
+    // string _question
     // YES and NO for now only
     // uint256 end time
     function createPredictionMarket(
@@ -122,11 +121,10 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         // Transfer the actual token amount (unscaled) to this contract
         IERC20Metadata(_collateralToken).transferFrom(msg.sender, address(this), _initialLiquidity);
 
-        bytes32 conditionId = keccak256(abi.encodePacked(_question, _endTime));
-        if(isMarketCreated[conditionId]){
-            revert() ;
-        }
-        else{
+        bytes32 conditionId = keccak256(abi.encodePacked(_question, _endTime, msg.sender, block.timestamp));
+        if (isMarketCreated[conditionId]) {
+            revert();
+        } else {
             isMarketCreated[conditionId] = true;
         }
 
@@ -146,7 +144,6 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         emit PNP_MarketCreated(conditionId, msg.sender);
         return conditionId;
     }
-
 
     function mintDecisionTokens(bytes32 conditionId, uint256 collateralAmount, uint256 tokenIdToMint)
         public
@@ -240,12 +237,12 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
 
     // Function to settle price markets
     // called by script only
-    function settleMarket(bytes32 conditionId, uint256 _winningTokenId) external onlyOwner() returns (uint256) {
+    function settleMarket(bytes32 conditionId, uint256 _winningTokenId) external onlyOwner returns (uint256) {
         require(block.timestamp > marketEndTime[conditionId], "Market ain't finished yet");
         require(!marketSettled[conditionId], "Market already settled brother");
 
         uint256 settledWinningTokenId = _winningTokenId;
-        
+
         // Store the winning token ID and mark the market as settled
         winningTokenId[conditionId] = settledWinningTokenId;
         marketSettled[conditionId] = true;
@@ -253,7 +250,6 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         return settledWinningTokenId;
     }
 
-    
     // Function to redeem position
     function redeemPosition(bytes32 conditionId) public nonReentrant returns (uint256) {
         require(marketSettled[conditionId], "Market not settled");
@@ -316,7 +312,4 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     function scaleFrom18Decimals(uint256 amount, uint256 tokenDecimals) internal pure returns (uint256) {
         return (amount * 10 ** tokenDecimals) / 10 ** 18;
     }
-
 }
-
-

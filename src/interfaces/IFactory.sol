@@ -7,7 +7,9 @@ interface IFactory {
     //////////////////////////////////////////////////////////////*/
 
     event PNP_MarketCreated(bytes32 indexed conditionId, address indexed marketCreator);
-    event PNP_DecisionTokensMinted(bytes32 indexed conditionId, uint256 tokenId, address indexed minter, uint256 amount);
+    event PNP_DecisionTokensMinted(
+        bytes32 indexed conditionId, uint256 tokenId, address indexed minter, uint256 amount
+    );
     event PNP_DecisionTokenBurned(bytes32 indexed conditionId, uint256 tokenId, address indexed burner, uint256 amount);
     event PNP_PositionRedeemed(address indexed user, bytes32 indexed conditionId, uint256 amount);
     event PNP_MarketSettled(bytes32 indexed conditionId, uint256 winningTokenId, address indexed user);
@@ -31,17 +33,13 @@ interface IFactory {
         uint256 _endTime
     ) external returns (bytes32);
 
-    function mintDecisionTokens(
-        bytes32 conditionId, 
-        uint256 collateralAmount, 
-        uint256 tokenIdToMint
-    ) external returns (uint256);
+    function mintDecisionTokens(bytes32 conditionId, uint256 collateralAmount, uint256 tokenIdToMint)
+        external
+        returns (uint256);
 
-    function burnDecisionTokens(
-        bytes32 conditionId, 
-        uint256 tokenIdToBurn, 
-        uint256 tokensToBurn
-    ) external returns (uint256);
+    function burnDecisionTokens(bytes32 conditionId, uint256 tokenIdToBurn, uint256 tokensToBurn)
+        external
+        returns (uint256);
 
     function settleMarket(bytes32 conditionId, uint256 _winningTokenId) external returns (uint256);
 

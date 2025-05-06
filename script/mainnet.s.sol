@@ -27,7 +27,6 @@
 //         console2.log("PNPFactory deployed at:", address(factory));
 //         console2.log("PriceModule deployed at:", address(priceModule));
 
-
 //         vm.stopBroadcast();
 
 //         // Log deployment summary

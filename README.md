@@ -108,3 +108,14 @@ This library provides the mathematical foundation for the automated market maker
 *   `getPrice(r, a, b)`: Calculates the current instantaneous price of outcome token 'a' based on the reserve 'r' and supplies 'a' and 'b'.
 
 This system provides a robust and decentralized platform for creating and participating in prediction markets.
+
+
+## BASE SEPOLIA DEPLOYMENT
+
+Chain 84532
+
+PNPFactory deployed to: 0xB137dD28892Da8C0c6Aa93EB93f1Cf618bEB5CF2
+Owner (deployer): 0xaF2E9429B2E8643dDA80844D8a08Dc9f630640bc
+
+Minimum deposit while market creation + Minimum required liquidity for buying YES/NO  will be : 1 USDC 
+( slightly greater than this )

@@ -45,10 +45,16 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     /// @dev YES | NO tokens are scaled with 18 decimals
     uint256 constant DECISION_TOKEN_DECIMALS = 18;
 
+    /// @dev true if trading is stopped for market
+    mapping(bytes32 => bool) public isTradingStopped;
+
     /// @dev Charged when minting
     /// @dev Fees goes to winning token holders
     /// @dev To become LP, buy both YES and NO tokens to be eligible for claimable fees
     uint256 public TAKE_FEE = 100; // take 1% fees ( in bps )
+
+    /// @dev Minimum amount for creating markets and minting tokens (1 USDC)
+    uint256 constant MIN_AMOUNT = 1_000_000;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -62,6 +68,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     event PNP_PositionRedeemed(address indexed user, bytes32 indexed conditionId, uint256 amount);
     event PNP_MarketSettled(bytes32 indexed conditionId, uint256 winningTokenId, address indexed user);
     event PNP_TakeFeeUpdated(uint256 newTakeFee);
+    event MarketTradingHalted(bytes32 indexed conditionId);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -70,6 +77,20 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     error MarketTradingStopped();
     error InvalidAddress(address addr);
     error InvalidTokenId(address addr, uint256 tokenId);
+    error InsufficientAmount(uint256 provided, uint256 minimum);
+    error TradingHalted();
+
+    /*//////////////////////////////////////////////////////////////
+                                MODIFIERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Ensures the amount is at least MIN_AMOUNT (1 USDC or equivalent)
+    modifier checkMinimumAmount(uint256 amount) {
+        if (amount < MIN_AMOUNT) {
+            revert InsufficientAmount(amount, MIN_AMOUNT);
+        }
+        _;
+    }
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
@@ -100,7 +121,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         address _collateralToken,
         string memory _question,
         uint256 _endTime
-    ) external nonReentrant returns (bytes32) {
+    ) external nonReentrant checkMinimumAmount(_initialLiquidity) returns (bytes32) {
         // need to split IL to outcome1 outcome2 YES NO for now
         require(_initialLiquidity > 0, "Invalid liquidity wtf");
 
@@ -148,46 +169,60 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     function mintDecisionTokens(bytes32 conditionId, uint256 collateralAmount, uint256 tokenIdToMint)
         public
         nonReentrant
+        checkMinimumAmount(collateralAmount)
     {
-        require(collateralAmount > 0, "Invalid collateral amount");
         require(isMarketCreated[conditionId], "Market doesn't exist");
         require(block.timestamp <= marketEndTime[conditionId], "Market trading stopped");
+        require(!isTradingStopped[conditionId], "Trading halted for this market");
 
-        uint256 collateralDecimals = IERC20Metadata(collateralToken[conditionId]).decimals();
+        address currentCollateralTokenAddress = collateralToken[conditionId]; // Cache the token address
+        uint256 tokenDecimals = IERC20Metadata(currentCollateralTokenAddress).decimals();
 
-        // Scale collateral amount to 18 decimals
-        uint256 scaledFullAmount = scaleTo18Decimals(collateralAmount, collateralDecimals);
+        // This is the full collateral amount scaled, used for updating the total reserve.
+        uint256 scaledFullCollateralAmount = scaleTo18Decimals(collateralAmount, tokenDecimals);
 
-        // Calculate fee and scale it
-        uint256 amountAfterFee = (collateralAmount * (10000 - TAKE_FEE)) / 10000;
-        uint256 scaledAmount = scaleTo18Decimals(amountAfterFee, collateralDecimals);
+        uint256 tokensToMintOutput;
+        uint256 initialMarketReserve = marketReserve[conditionId]; // Read once for calculation and later update
 
-        uint256 scaledReserve = marketReserve[conditionId];
+        {
+            // Inner scope for token calculation logic to reduce stack pressure later
+            uint256 yesId = getYesTokenId(conditionId);
+            uint256 noId = getNoTokenId(conditionId);
 
-        uint256 yesTokenId = uint256(keccak256(abi.encodePacked(conditionId, "YES")));
-        uint256 noTokenId = uint256(keccak256(abi.encodePacked(conditionId, "NO")));
+            // Ensure tokenIdToMint is either the YES or NO token for this market
+            if (tokenIdToMint != yesId && tokenIdToMint != noId) {
+                revert InvalidTokenId(msg.sender, tokenIdToMint);
+            }
 
-        uint256 yesSupply = totalSupply(yesTokenId);
-        uint256 noSupply = totalSupply(noTokenId);
+            // Calculate the net amount after fee, then scale it for the bonding curve calculation
+            uint256 amountAfterFee = (collateralAmount * (10000 - TAKE_FEE)) / 10000;
+            uint256 scaledAmountForBonding = scaleTo18Decimals(amountAfterFee, tokenDecimals);
 
-        uint256 tokensToMint;
-        if (tokenIdToMint == yesTokenId) {
-            tokensToMint = PythagoreanBondingCurve.getTokensToMint(scaledReserve, yesSupply, noSupply, scaledAmount);
-        } else if (tokenIdToMint == noTokenId) {
-            tokensToMint = PythagoreanBondingCurve.getTokensToMint(scaledReserve, noSupply, yesSupply, scaledAmount);
-        } else {
-            revert InvalidTokenId(msg.sender, tokenIdToMint);
-        }
+            uint256 currentYesSupply = totalSupply(yesId);
+            uint256 currentNoSupply = totalSupply(noId);
 
-        // Transfer unscaled amount
-        IERC20(collateralToken[conditionId]).transferFrom(msg.sender, address(this), collateralAmount);
-        // Update reserve with scaled amount
-        marketReserve[conditionId] = scaledReserve + scaledFullAmount;
+            if (tokenIdToMint == yesId) {
+                tokensToMintOutput = PythagoreanBondingCurve.getTokensToMint(
+                    initialMarketReserve, currentYesSupply, currentNoSupply, scaledAmountForBonding
+                );
+            } else {
+                // tokenIdToMint must be noId due to the earlier check
+                tokensToMintOutput = PythagoreanBondingCurve.getTokensToMint(
+                    initialMarketReserve, currentNoSupply, currentYesSupply, scaledAmountForBonding
+                );
+            }
+        } // Variables from this scope are released: yesId, noId, amountAfterFee, scaledAmountForBonding, currentYesSupply, currentNoSupply
 
-        // Mint decision tokens (already in 18 decimals)
-        _mint(msg.sender, tokenIdToMint, tokensToMint, "");
+        // Perform the collateral transfer
+        IERC20(currentCollateralTokenAddress).transferFrom(msg.sender, address(this), collateralAmount);
 
-        emit PNP_DecisionTokensMinted(conditionId, tokenIdToMint, msg.sender, tokensToMint);
+        // Update the market reserve with the full scaled collateral amount
+        marketReserve[conditionId] = initialMarketReserve + scaledFullCollateralAmount;
+
+        // Mint the calculated decision tokens
+        _mint(msg.sender, tokenIdToMint, tokensToMintOutput, "");
+
+        emit PNP_DecisionTokensMinted(conditionId, tokenIdToMint, msg.sender, tokensToMintOutput);
     }
 
     function burnDecisionTokens(bytes32 conditionId, uint256 tokenIdToBurn, uint256 tokensToBurn)
@@ -197,6 +232,7 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
     {
         require(isMarketCreated[conditionId], "Market doesn't exist");
         require(block.timestamp <= marketEndTime[conditionId], "Market trading stopped");
+        // require(!isTradingStopped[conditionId], "Trading halted for this market");
         require(tokensToBurn > 0, "Invalid amount");
 
         require(balanceOf(msg.sender, tokenIdToBurn) >= tokensToBurn, "Insufficient balance");
@@ -289,6 +325,12 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         emit PNP_TakeFeeUpdated(_takeFee);
     }
 
+    function stopTrading(bytes32 conditionId) external onlyOwner {
+        require(isMarketCreated[conditionId], "Market doesn't exist");
+        isTradingStopped[conditionId] = true;
+        emit MarketTradingHalted(conditionId);
+    }
+
     /*//////////////////////////////////////////////////////////////
                                PUBLIC GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -305,11 +347,11 @@ contract PNPFactory is ERC1155Supply, Ownable, ReentrancyGuard {
         return uint256(keccak256(abi.encodePacked(conditionId, "NO")));
     }
 
-    function scaleTo18Decimals(uint256 amount, uint256 tokenDecimals) internal pure returns (uint256) {
+    function scaleTo18Decimals(uint256 amount, uint256 tokenDecimals) public pure returns (uint256) {
         return (amount * 10 ** 18) / 10 ** tokenDecimals;
     }
 
-    function scaleFrom18Decimals(uint256 amount, uint256 tokenDecimals) internal pure returns (uint256) {
+    function scaleFrom18Decimals(uint256 amount, uint256 tokenDecimals) public pure returns (uint256) {
         return (amount * 10 ** tokenDecimals) / 10 ** 18;
     }
 }

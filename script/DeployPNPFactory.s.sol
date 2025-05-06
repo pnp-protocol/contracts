@@ -12,8 +12,7 @@ contract DeployPNPFactoryScript is Script {
             revert("PRIVATE_KEY not set in .env file");
         }
         console.log("Private key loaded:", bytes(privateKey).length > 0);
-        uint256 deployerPrivateKey = vm.parseBytes32(string.concat("0x", privateKey));
-
+        uint256 deployerPrivateKey = vm.parseUint(privateKey);
 
         // Start broadcasting transactions using the loaded private key
         vm.startBroadcast(deployerPrivateKey);
@@ -22,8 +21,6 @@ contract DeployPNPFactoryScript is Script {
         // Replace "YOUR_ERC1155_METADATA_URI" with your actual metadata URI
         PNPFactory pnpFactory = new PNPFactory("https://pnp.exchange/api/outcomeTokens/{id}.json");
 
-        ;
-
         // Stop broadcasting
         vm.stopBroadcast();
 
@@ -31,4 +28,4 @@ contract DeployPNPFactoryScript is Script {
         console.log("PNPFactory deployed to:", address(pnpFactory));
         console.log("Owner (deployer):", pnpFactory.owner());
     }
-} 
+}
